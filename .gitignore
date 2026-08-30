@@ -1,0 +1,18 @@
+# --- Private docs (plans, research, phase docs) — never push ---
+doc/private/
+
+# --- Agent / chat state (OpenCode sessions, plans, run state) ---
+.omo/
+.opencode/
+AGENTS.md
+
+# --- Handoff files ---
+HANDOFF.md
+handoff*.md
+**/handoff*.md
+**/HANDOFF.md
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
