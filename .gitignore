@@ -16,3 +16,22 @@ handoff*.md
 .env
 .env.*
 !.env.example
+
+# --- Benchmark test set & outputs (personal photos, results) — private ---
+test/
+output/
+
+# --- Python artifacts ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# --- macOS ---
+.DS_Store

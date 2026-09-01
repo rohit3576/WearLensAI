@@ -1,0 +1,125 @@
+[project]
+name = "wearlens-ai"
+version = "0.1.0"
+description = "WearLensAI — AI virtual try-on: model benchmark + inference adapters"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anyio>=4",
+    "fal-client>=1",
+    "httpx2[http2,brotli,zstd]>=0.30",
+    "pillow>=11",
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    "rich>=13",
+    "typer>=0.12",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.21",
+    "ruff>=0.8",
+    "pytest>=8",
+    "pytest-cov>=5",
+]
+
+[tool.uv]
+package = false
+
+# ─────────────────────────────────────────────────────────────────
+# basedpyright - typeCheckingMode = "all" sets every report flag to error
+# ─────────────────────────────────────────────────────────────────
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.13"
+pythonPlatform = "All"
+include = ["ai", "tests"]
+exclude = ["**/__pycache__", "**/.venv", "**/build", "**/dist"]
+
+reportUnusedCallResult = "warning"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnusedVariable = "error"
+reportMissingParameterType = "error"
+reportMissingReturnType = "error"
+reportPrivateUsage = "error"
+
+# ─────────────────────────────────────────────────────────────────
+# ruff - select = ["ALL"], minimal formatter/docstyle conflicts ignored
+# ─────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["ai", "tests"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",   # missing trailing comma (formatter conflict)
+    "ISC001",   # implicit string concat (formatter conflict)
+    "D203",     # docstyle conflict (D211 preferred)
+    "D213",     # docstyle conflict (D212 preferred)
+    "CPY001",   # missing copyright notice
+    "FBT001",   # boolean positional arg in def (typer CLI)
+    "FBT002",   # boolean positional default in def (typer CLI)
+    "TD002",    # missing TODO author
+    "TD003",    # missing TODO link
+    "FIX002",   # line contains TODO
+]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # assert is the point of pytest
+    "ARG",      # unused args (fixtures)
+    "PLR2004",  # magic numbers in test data
+    "SLF001",   # tests access private members
+    "D",        # docstrings not required in tests
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "typer.Argument",
+    "typer.Option",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+# ─────────────────────────────────────────────────────────────────
+# pytest — fal-marked tests call the real API (costs credits); they
+# are deselected by default so a bare `pytest` never spends money.
+# ─────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "-m",
+    "not fal",
+]
+markers = [
+    "fal: integration tests that call the fal.ai API and spend credits (run with -m fal)",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["ai"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]
