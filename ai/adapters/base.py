@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import ClassVar, Protocol, runtime_checkable
 
 
 class AdapterError(Exception):
@@ -20,16 +20,25 @@ class AdapterError(Exception):
 class MissingApiKeyError(AdapterError):
     """The provider API key is absent from the environment."""
 
+    env_var: str
+
     def __init__(self, env_var: str) -> None:
-        super().__init__(f"API key missing: set {env_var} in .env")
+        """Remember which environment variable the operator must set."""
+        message = f"API key missing: set {env_var} in .env"
+        super().__init__(message)
         self.env_var = env_var
 
 
 class ProviderCallError(AdapterError):
     """The provider call failed or returned an unusable payload."""
 
+    provider: str
+    detail: str
+
     def __init__(self, provider: str, detail: str) -> None:
-        super().__init__(f"{provider}: {detail}")
+        """Remember which provider failed and why."""
+        message = f"{provider}: {detail}"
+        super().__init__(message)
         self.provider = provider
         self.detail = detail
 
@@ -49,11 +58,12 @@ class TryOnResult:
     image_url: str
 
 
+@runtime_checkable
 class TryOnAdapter(Protocol):
     """The contract every try-on provider implements."""
 
-    name: str
-    price_per_generation_usd: float
+    name: ClassVar[str]
+    price_per_generation_usd: ClassVar[float]
 
     def try_on(self, request: TryOnRequest) -> Awaitable[TryOnResult]:
         """Generate a try-on image; raises a subclass of AdapterError on failure."""

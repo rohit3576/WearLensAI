@@ -31,7 +31,12 @@ from ai.benchmark.records import (
     summarize,
     write_results_jsonl,
 )
-from ai.benchmark.registry import CANDIDATES, InvalidCandidateError, make_adapter, parse_candidates
+from ai.benchmark.registry import (
+    CANDIDATES,
+    InvalidCandidateError,
+    make_adapter,
+    parse_candidates,
+)
 from ai.net import create_async_client
 from ai.preprocessing.validate import ImageValidationError, validate_image
 
@@ -39,6 +44,17 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 console = Console()
 
 SCORES_HEADER = "candidate,person,garment,identity,garment_fidelity,visual_quality"
+
+
+@dataclass(frozen=True, slots=True)
+class PairOutcome:
+    """Everything a finished pair run observed, before it becomes a record."""
+
+    ok: bool
+    latency_s: float
+    result_url: str | None
+    result_path: str | None
+    error: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,30 +86,22 @@ def _preflight(pairs: Sequence[TestPair]) -> None:
 async def _download(client: httpx2.AsyncClient, url: str, dest: Path) -> None:
     response = await client.get(url)
     response.raise_for_status()
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(response.content)
+    async_dest = anyio.Path(dest)
+    await async_dest.parent.mkdir(parents=True, exist_ok=True)
+    await async_dest.write_bytes(response.content)
 
 
-def _record(
-    ctx: RunContext,
-    pair: TestPair,
-    *,
-    ok: bool,
-    latency_s: float,
-    result_url: str | None,
-    result_path: str | None,
-    error: str | None,
-) -> RunRecord:
+def _record(ctx: RunContext, pair: TestPair, outcome: PairOutcome) -> RunRecord:
     """Build a RunRecord with the shared identity fields filled in."""
     return RunRecord(
         candidate=ctx.adapter.name,
         person=pair.person.name,
         garment=pair.garment.name,
-        ok=ok,
-        latency_s=latency_s,
-        result_url=result_url,
-        result_path=result_path,
-        error=error,
+        ok=outcome.ok,
+        latency_s=outcome.latency_s,
+        result_url=outcome.result_url,
+        result_path=outcome.result_path,
+        error=outcome.error,
     )
 
 
@@ -105,38 +113,35 @@ async def _run_pair(ctx: RunContext, pair: TestPair) -> RunRecord:
             TryOnRequest(person_image=pair.person, garment_image=pair.garment)
         )
     except AdapterError as err:
-        return _record(
-            ctx,
-            pair,
+        outcome = PairOutcome(
             ok=False,
             latency_s=round(time.perf_counter() - start, 3),
             result_url=None,
             result_path=None,
             error=error_text(err),
         )
+        return _record(ctx, pair, outcome)
     latency = round(time.perf_counter() - start, 3)
     dest = ctx.out_dir / f"{pair.person.stem}__{pair.garment.stem}.jpg"
     try:
         await _download(ctx.client, result.image_url, dest)
     except httpx2.HTTPError as err:
-        return _record(
-            ctx,
-            pair,
+        outcome = PairOutcome(
             ok=True,
             latency_s=latency,
             result_url=result.image_url,
             result_path=None,
             error=f"download failed: {err}",
         )
-    return _record(
-        ctx,
-        pair,
+        return _record(ctx, pair, outcome)
+    outcome = PairOutcome(
         ok=True,
         latency_s=latency,
         result_url=result.image_url,
         result_path=str(dest),
         error=None,
     )
+    return _record(ctx, pair, outcome)
 
 
 async def _run_candidate(
@@ -204,10 +209,9 @@ async def _run_all(
     write_results_jsonl(tuple(all_records), results_path)
     _write_scores_template(all_records, out_dir / "scores.csv")
     _print_summary(summaries)
-    console.print(
-        f"\nresults: {results_path}\nscores:  {out_dir / 'scores.csv'}"
-        " (fill in 1-10, then run build_report)"
-    )
+    scores_path = out_dir / "scores.csv"
+    console.print(f"\nresults: {results_path}")
+    console.print(f"scores:  {scores_path} (fill in 1-10, then run build_report)")
 
 
 @app.command()
@@ -223,7 +227,7 @@ def run(
 ) -> None:
     """Run the benchmark for the given candidates. SPENDS fal.ai credits."""
     try:
-        parse_candidates(candidates)
+        _ = parse_candidates(candidates)
         pairs = discover_test_set(test_dir)
         _preflight(pairs)
     except (InvalidCandidateError, TestSetError) as err:

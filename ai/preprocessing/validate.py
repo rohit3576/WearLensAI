@@ -19,8 +19,13 @@ ALLOWED_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 class ImageValidationError(Exception):
     """Typed validation failure with a user-actionable reason."""
 
+    path: Path
+    reason: str
+
     def __init__(self, path: Path, reason: str) -> None:
-        super().__init__(f"{path.name}: {reason}")
+        """Remember which path failed and why."""
+        message = f"{path.name}: {reason}"
+        super().__init__(message)
         self.path = path
         self.reason = reason
 
@@ -35,7 +40,11 @@ class ValidatedImage:
 
 
 def validate_image(path: Path) -> ValidatedImage:
-    """Parse an untrusted image path into a ValidatedImage or raise ImageValidationError."""
+    """Parse an untrusted image path into a ValidatedImage.
+
+    Raises :class:`ImageValidationError` when the file is missing, has an
+    unsupported format, is undecodable, or is outside the size window.
+    """
     if not path.is_file():
         raise ImageValidationError(path, "file not found")
     if path.suffix.lower() not in ALLOWED_SUFFIXES:
@@ -49,13 +58,15 @@ def validate_image(path: Path) -> ValidatedImage:
         raise ImageValidationError(path, "not a decodable image") from err
     short_edge, long_edge = min(width, height), max(width, height)
     if short_edge < MIN_EDGE_PX:
-        raise ImageValidationError(
-            path,
-            f"resolution too low ({width}x{height}); shortest side must be >= {MIN_EDGE_PX}px",
+        reason = (
+            f"resolution too low ({width}x{height}); "
+            f"shortest side must be >= {MIN_EDGE_PX}px"
         )
+        raise ImageValidationError(path, reason)
     if long_edge > MAX_EDGE_PX:
-        raise ImageValidationError(
-            path,
-            f"resolution too high ({width}x{height}); longest side must be <= {MAX_EDGE_PX}px",
+        reason = (
+            f"resolution too high ({width}x{height}); "
+            f"longest side must be <= {MAX_EDGE_PX}px"
         )
+        raise ImageValidationError(path, reason)
     return ValidatedImage(path=path, width=width, height=height)

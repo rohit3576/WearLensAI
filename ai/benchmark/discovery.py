@@ -38,14 +38,18 @@ def _images_in(directory: Path) -> tuple[Path, ...]:
 def discover_test_set(test_dir: Path) -> tuple[TestPair, ...]:
     """Return the full person x garment cross product, or raise TestSetError."""
     if not test_dir.is_dir():
-        raise TestSetError(f"test directory not found: {test_dir}")
+        message = f"test directory not found: {test_dir}"
+        raise TestSetError(message)
     garment_dir = test_dir / GARMENT_DIR_NAME
     if not garment_dir.is_dir():
-        raise TestSetError(f"garment directory not found: {garment_dir}")
+        message = f"garment directory not found: {garment_dir}"
+        raise TestSetError(message)
     persons = _images_in(test_dir)
     garments = _images_in(garment_dir)
     if not persons:
-        raise TestSetError(f"no person images found in {test_dir}")
+        message = f"no person images found in {test_dir}"
+        raise TestSetError(message)
     if not garments:
-        raise TestSetError(f"no garment images found in {garment_dir}")
+        message = f"no garment images found in {garment_dir}"
+        raise TestSetError(message)
     return tuple(TestPair(person=p, garment=g) for p in persons for g in garments)

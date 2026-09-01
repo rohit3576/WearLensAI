@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
+
+from pydantic import BaseModel, ConfigDict
 
 from ai.adapters.base import AdapterError
 
@@ -38,18 +41,33 @@ class RunRecord:
         )
 
 
+class _RunRecordJson(BaseModel):
+    """JSONL wire shape of a RunRecord — the parse boundary for read-back."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    candidate: str
+    person: str
+    garment: str
+    ok: bool
+    latency_s: float | None
+    result_url: str | None
+    result_path: str | None
+    error: str | None
+
+
 def record_from_json_line(line: str) -> RunRecord:
     """Parse one JSONL line back into a RunRecord."""
-    raw = json.loads(line)
+    raw = _RunRecordJson.model_validate_json(line)
     return RunRecord(
-        candidate=raw["candidate"],
-        person=raw["person"],
-        garment=raw["garment"],
-        ok=raw["ok"],
-        latency_s=raw["latency_s"],
-        result_url=raw["result_url"],
-        result_path=raw["result_path"],
-        error=raw["error"],
+        candidate=raw.candidate,
+        person=raw.person,
+        garment=raw.garment,
+        ok=raw.ok,
+        latency_s=raw.latency_s,
+        result_url=raw.result_url,
+        result_path=raw.result_path,
+        error=raw.error,
     )
 
 

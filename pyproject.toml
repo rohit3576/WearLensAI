@@ -42,6 +42,14 @@ reportUnusedVariable = "error"
 reportMissingParameterType = "error"
 reportMissingReturnType = "error"
 reportPrivateUsage = "error"
+# typer resolves CLI annotations at runtime; typer.Option(...) defaults are
+# the framework idiom, not a mutation hazard.
+reportCallInDefaultInitializer = "none"
+# fal-client ships bare `os.PathLike` params and `Dict[str, Any]` returns;
+# its partially-known signatures trip the unknown-family at our seam.
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
 
 # ─────────────────────────────────────────────────────────────────
 # ruff - select = ["ALL"], minimal formatter/docstyle conflicts ignored
@@ -53,6 +61,7 @@ src = ["ai", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
+external = ["MATCH_OK"]
 ignore = [
     "COM812",   # missing trailing comma (formatter conflict)
     "ISC001",   # implicit string concat (formatter conflict)
@@ -64,6 +73,10 @@ ignore = [
     "TD002",    # missing TODO author
     "TD003",    # missing TODO link
     "FIX002",   # line contains TODO
+    "TRY003",   # long messages in exceptions — user-actionable errors are the project style
+    "TC001",    # typer/pydantic resolve annotations at runtime; imports must stay real
+    "TC002",    # same, third-party
+    "TC003",    # same, stdlib
 ]
 fixable = ["ALL"]
 unfixable = []
@@ -75,6 +88,7 @@ unfixable = []
     "PLR2004",  # magic numbers in test data
     "SLF001",   # tests access private members
     "D",        # docstrings not required in tests
+    "EM102",    # fakes raise SDK-style f-string errors
 ]
 
 [tool.ruff.lint.pydocstyle]
