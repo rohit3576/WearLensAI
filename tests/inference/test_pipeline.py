@@ -55,6 +55,8 @@ async def test_happy_path_dry_run_fashn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("TRYON_ADAPTER", raising=False)
+    out_dir = tmp_path / "tryon"
+    monkeypatch.setenv("TRYON_OUTPUT_DIR", str(out_dir))
     person, garment = _pair(tmp_path)
 
     outcome = await virtual_try_on(
@@ -63,10 +65,14 @@ async def test_happy_path_dry_run_fashn(
 
     assert outcome.adapter == "fashn_v1_6"
     assert outcome.result_url.startswith("dry-run://")
-    assert outcome.result_path is None
     assert outcome.person_image == person  # FASHN has no MP budget: passthrough
     assert outcome.garment_image == garment
     assert outcome.latency_s >= 0
+    assert outcome.result_path is not None
+    assert outcome.result_path == out_dir / "fashn_v1_6" / "person__shirt.jpg"
+    assert outcome.result_path.is_file()
+    assert outcome.comparison_path is not None
+    assert outcome.comparison_path.is_file()
 
 
 async def test_flux_budget_downscales_person(

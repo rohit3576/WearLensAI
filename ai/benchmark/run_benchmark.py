@@ -28,7 +28,6 @@ from rich.table import Table
 
 from ai.adapters.base import AdapterError, TryOnAdapter, TryOnRequest
 from ai.benchmark.discovery import TestPair, TestSetError, discover_test_set
-from ai.benchmark.dryrun import write_result_placeholder
 from ai.benchmark.records import (
     CandidateSummary,
     RunRecord,
@@ -44,6 +43,7 @@ from ai.benchmark.registry import (
     parse_candidates,
 )
 from ai.net import create_async_client
+from ai.postprocessing.save import write_result_placeholder
 from ai.preprocessing.validate import ImageValidationError, validate_image
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)

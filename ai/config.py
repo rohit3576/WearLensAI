@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     tryon_adapter: str = "fashn_v1_6"
     tryon_timeout_s: float = 120.0
     resize_cache_dir: str = "output/cache/resized"
+    tryon_output_dir: str = "output/tryon"
 
 
 def load_settings() -> Settings:

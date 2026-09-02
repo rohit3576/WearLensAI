@@ -1,24 +1,17 @@
-"""Offline stand-ins for the live fal gateway.
+"""Offline stand-in for the live fal gateway.
 
 ``DryRunGateway`` feeds the real adapters fake URLs and a schema-shaped
-payload; :func:`write_result_placeholder` replaces result downloads with
-tiny valid JPEGs so downstream tooling sees real files on disk.
+payload, proving the benchmark loop with zero API spend. Placeholder result
+writing lives in ``ai.postprocessing.save``.
 """
 
 from __future__ import annotations
 
-import io
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Final, final
-
-import anyio
-from PIL import Image
+from typing import final
 
 from ai.adapters.fal import JsonValue
-
-PLACEHOLDER_SIZE_PX: Final = 16
-PLACEHOLDER_COLOR: Final = (120, 120, 130)
 
 
 @final
@@ -36,15 +29,3 @@ class DryRunGateway:
         return {
             "images": [{"url": f"dry-run://results/{model_id}?{len(arguments)}args"}]
         }
-
-
-async def write_result_placeholder(dest: Path) -> None:
-    """Write a tiny valid JPEG so downstream tooling sees real files."""
-    image = Image.new(
-        "RGB", (PLACEHOLDER_SIZE_PX, PLACEHOLDER_SIZE_PX), PLACEHOLDER_COLOR
-    )
-    buffer = io.BytesIO()
-    image.save(buffer, format="JPEG")
-    async_dest = anyio.Path(dest)
-    await async_dest.parent.mkdir(parents=True, exist_ok=True)
-    await async_dest.write_bytes(buffer.getvalue())

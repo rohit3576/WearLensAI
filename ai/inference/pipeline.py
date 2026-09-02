@@ -19,12 +19,19 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import anyio
 
 from ai.adapters.base import TryOnAdapter, TryOnRequest, TryOnResult
 from ai.benchmark.registry import make_adapter, make_dry_adapter
 from ai.config import load_settings
+from ai.net import create_async_client
+from ai.postprocessing.save import (
+    make_comparison,
+    save_result,
+    write_result_placeholder,
+)
 from ai.preprocessing.resize import downscale_to_budget
 from ai.preprocessing.validate import ValidatedImage, validate_image
 
@@ -52,6 +59,7 @@ class TryOnOutcome:
     garment_image: Path
     result_url: str
     result_path: Path | None
+    comparison_path: Path | None
     latency_s: float
 
 
@@ -82,6 +90,23 @@ def _resized(
     return downscale_to_budget(image, max_mp, cache_dir)
 
 
+async def _persist_result(
+    result_url: str, dest: Path, *, dry_run: bool
+) -> Path:
+    """Save the hosted result (or a placeholder in dry-run) to ``dest``."""
+    if dry_run:
+        await write_result_placeholder(dest)
+        return dest
+    async with create_async_client() as client:
+        return await save_result(client, result_url, dest)
+
+
+def _result_suffix(result_url: str) -> str:
+    """File suffix from the result URL; ``.jpg`` when none is present."""
+    suffix = Path(urlparse(result_url).path).suffix.lower()
+    return suffix if suffix in {".jpg", ".jpeg", ".png", ".webp"} else ".jpg"
+
+
 async def virtual_try_on(
     person_image: Path,
     garment_image: Path,
@@ -89,7 +114,7 @@ async def virtual_try_on(
     adapter_id: str | None = None,
     dry_run: bool = False,
 ) -> TryOnOutcome:
-    """Validate, resize, and run one try-on; result download arrives in Step 4."""
+    """Validate, resize, run, and persist one try-on with a comparison image."""
     settings = load_settings()
     adapter = resolve_adapter(adapter_id, settings.tryon_adapter, dry_run=dry_run)
     person = validate_image(person_image)
@@ -101,11 +126,26 @@ async def virtual_try_on(
     )
     start = time.perf_counter()
     result = await run_with_timeout(adapter, request, settings.tryon_timeout_s)
+    dest = (
+        Path(settings.tryon_output_dir)
+        / adapter.name
+        / (
+            f"{person_image.stem}__{garment_image.stem}"
+            f"{_result_suffix(result.image_url)}"
+        )
+    )
+    result_path = await _persist_result(result.image_url, dest, dry_run=dry_run)
+    comparison_path = make_comparison(
+        request.person_image,
+        result_path,
+        result_path.with_name(f"{result_path.stem}__compare.jpg"),
+    )
     return TryOnOutcome(
         adapter=adapter.name,
         person_image=request.person_image,
         garment_image=request.garment_image,
         result_url=result.image_url,
-        result_path=None,
+        result_path=result_path,
+        comparison_path=comparison_path,
         latency_s=round(time.perf_counter() - start, 3),
     )
