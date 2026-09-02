@@ -6,11 +6,15 @@
 #   uv run python -m ai.benchmark.run_benchmark --candidate fashn_v1_6 --limit 2
 #   uv run python -m ai.benchmark.run_benchmark list-candidates
 #
-# SPENDS fal.ai credits — every candidate x pair combination is one paid generation.
+# Dry run (zero spend, fake gateway, placeholder images):
+#   uv run python -m ai.benchmark.run_benchmark --candidate fashn_v1_6 --dry-run
+#
+# Real runs SPEND fal.ai credits — every candidate x pair is one paid generation.
 """
 
 from __future__ import annotations
 
+import functools
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -24,6 +28,7 @@ from rich.table import Table
 
 from ai.adapters.base import AdapterError, TryOnAdapter, TryOnRequest
 from ai.benchmark.discovery import TestPair, TestSetError, discover_test_set
+from ai.benchmark.dryrun import write_result_placeholder
 from ai.benchmark.records import (
     CandidateSummary,
     RunRecord,
@@ -35,6 +40,7 @@ from ai.benchmark.registry import (
     CANDIDATES,
     InvalidCandidateError,
     make_adapter,
+    make_dry_adapter,
     parse_candidates,
 )
 from ai.net import create_async_client
@@ -64,9 +70,10 @@ class RunContext:
     adapter: TryOnAdapter
     out_dir: Path
     client: httpx2.AsyncClient
+    dry_run: bool
 
 
-def _preflight(pairs: Sequence[TestPair]) -> None:
+def preflight(pairs: Sequence[TestPair]) -> None:
     """Validate every distinct image once before spending any credits."""
     seen: set[Path] = set()
     problems: list[str] = []
@@ -123,6 +130,16 @@ async def _run_pair(ctx: RunContext, pair: TestPair) -> RunRecord:
         return _record(ctx, pair, outcome)
     latency = round(time.perf_counter() - start, 3)
     dest = ctx.out_dir / f"{pair.person.stem}__{pair.garment.stem}.jpg"
+    if ctx.dry_run:
+        await write_result_placeholder(dest)
+        outcome = PairOutcome(
+            ok=True,
+            latency_s=latency,
+            result_url=result.image_url,
+            result_path=str(dest),
+            error=None,
+        )
+        return _record(ctx, pair, outcome)
     try:
         await _download(ctx.client, result.image_url, dest)
     except httpx2.HTTPError as err:
@@ -191,17 +208,29 @@ def _print_summary(summaries: Sequence[CandidateSummary]) -> None:
     console.print(table)
 
 
-async def _run_all(
-    candidate_ids: Sequence[str], pairs: Sequence[TestPair], out_dir: Path
+async def run_all(
+    candidate_ids: Sequence[str],
+    pairs: Sequence[TestPair],
+    out_dir: Path,
+    *,
+    dry_run: bool,
 ) -> None:
+    """Run every candidate over every pair; write records + scores template."""
     results_path = out_dir / "results.jsonl"
     all_records: list[RunRecord] = []
     summaries: list[CandidateSummary] = []
     async with create_async_client() as client:
         for candidate_id in candidate_ids:
-            adapter = make_adapter(candidate_id)
+            adapter = (
+                make_dry_adapter(candidate_id)
+                if dry_run
+                else make_adapter(candidate_id)
+            )
             ctx = RunContext(
-                adapter=adapter, out_dir=out_dir / adapter.name, client=client
+                adapter=adapter,
+                out_dir=out_dir / adapter.name,
+                client=client,
+                dry_run=dry_run,
             )
             records = await _run_candidate(ctx, pairs)
             all_records.extend(records)
@@ -224,19 +253,25 @@ def run(
     ),
     out_dir: Path = typer.Option(Path("output/benchmark"), help="Output directory"),
     limit: int = typer.Option(0, help="Max pairs per candidate (0 = all)"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Offline proof: fake gateway, no spend"
+    ),
 ) -> None:
-    """Run the benchmark for the given candidates. SPENDS fal.ai credits."""
+    """Run the benchmark for the given candidates (real runs SPEND credits)."""
     try:
         _ = parse_candidates(candidates)
         pairs = discover_test_set(test_dir)
-        _preflight(pairs)
+        preflight(pairs)
     except (InvalidCandidateError, TestSetError) as err:
         console.print(f"[red]error:[/red] {err}")
         raise typer.Exit(code=1) from err
     if limit > 0:
         pairs = pairs[:limit]
-    console.print(f"{len(pairs)} pairs x {len(candidates)} candidate(s)\n")
-    anyio.run(_run_all, candidates, pairs, out_dir)
+    mode = "DRY RUN (no spend)" if dry_run else "live (spends credits)"
+    console.print(f"{len(pairs)} pairs x {len(candidates)} candidate(s) — {mode}\n")
+    anyio.run(
+        functools.partial(run_all, candidates, pairs, out_dir, dry_run=dry_run)
+    )
 
 
 @app.command()

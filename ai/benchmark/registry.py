@@ -1,14 +1,16 @@
-"""Candidate registry: benchmark candidate ids → adapter factories."""
+"""Candidate registry: benchmark candidate ids → adapter classes."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import Final
 
 from ai.adapters.base import TryOnAdapter
+from ai.adapters.fal import FalTryOnAdapter
 from ai.adapters.fashn_v16 import FashnV16Adapter
 from ai.adapters.flux_vto import FluxVtoAdapter
+from ai.benchmark.dryrun import DryRunGateway
 
 
 class InvalidCandidateError(Exception):
@@ -22,19 +24,9 @@ class CandidateId(StrEnum):
     FLUX_VTO = "flux_vto"
 
 
-def _fashn_v1_6_factory() -> TryOnAdapter:
-    """Build the FASHN v1.6 adapter with production defaults."""
-    return FashnV16Adapter()
-
-
-def _flux_vto_factory() -> TryOnAdapter:
-    """Build the FLUX VTO adapter with production defaults."""
-    return FluxVtoAdapter()
-
-
-CANDIDATES: Final[dict[CandidateId, Callable[[], TryOnAdapter]]] = {
-    CandidateId.FASHN_V1_6: _fashn_v1_6_factory,
-    CandidateId.FLUX_VTO: _flux_vto_factory,
+CANDIDATES: Final[dict[CandidateId, type[FalTryOnAdapter]]] = {
+    CandidateId.FASHN_V1_6: FashnV16Adapter,
+    CandidateId.FLUX_VTO: FluxVtoAdapter,
 }
 
 
@@ -48,11 +40,25 @@ def parse_candidates(ids: Sequence[str]) -> tuple[CandidateId, ...]:
     return tuple(CandidateId(i) for i in ids)
 
 
-def make_adapter(candidate_id: str) -> TryOnAdapter:
-    """Instantiate the adapter for a candidate id; raise if unknown."""
+def _lookup(candidate_id: str) -> type[FalTryOnAdapter]:
+    """Resolve a candidate id to its adapter class or raise a typed error."""
     try:
         key = CandidateId(candidate_id)
     except ValueError as err:
         message = f"unknown candidate: {candidate_id}"
         raise InvalidCandidateError(message) from err
-    return CANDIDATES[key]()
+    return CANDIDATES[key]
+
+
+def make_adapter(candidate_id: str) -> TryOnAdapter:
+    """Instantiate the live adapter for a candidate id; raise if unknown."""
+    return _lookup(candidate_id)()
+
+
+def make_dry_adapter(candidate_id: str) -> TryOnAdapter:
+    """Instantiate the offline stand-in: same schema handling, zero network.
+
+    Uses the real adapter class with the fake gateway and a dummy key, so a
+    dry run exercises discovery → validation → argument building → records.
+    """
+    return _lookup(candidate_id)(gateway=DryRunGateway(), key="dry-run")

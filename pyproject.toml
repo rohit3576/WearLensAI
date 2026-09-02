@@ -70,6 +70,7 @@ ignore = [
     "CPY001",   # missing copyright notice
     "FBT001",   # boolean positional arg in def (typer CLI)
     "FBT002",   # boolean positional default in def (typer CLI)
+    "FBT003",   # boolean positional value in call (typer.Option(False, ...))
     "TD002",    # missing TODO author
     "TD003",    # missing TODO link
     "FIX002",   # line contains TODO

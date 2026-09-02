@@ -10,6 +10,7 @@ from ai.benchmark.registry import (
     CANDIDATES,
     InvalidCandidateError,
     make_adapter,
+    make_dry_adapter,
     parse_candidates,
 )
 
@@ -34,6 +35,13 @@ def test_make_adapter_returns_matching_class() -> None:
 def test_make_adapter_rejects_unknown_id() -> None:
     with pytest.raises(InvalidCandidateError):
         make_adapter("gpt_tryon")
+
+
+def test_make_dry_adapter_builds_offline_standins() -> None:
+    assert isinstance(make_dry_adapter("fashn_v1_6"), FashnV16Adapter)
+    assert isinstance(make_dry_adapter("flux_vto"), FluxVtoAdapter)
+    with pytest.raises(InvalidCandidateError):
+        make_dry_adapter("gpt_tryon")
 
 
 def test_every_factory_builds_offline_without_a_key() -> None:
