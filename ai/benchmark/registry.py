@@ -45,7 +45,8 @@ def _lookup(candidate_id: str) -> type[FalTryOnAdapter]:
     try:
         key = CandidateId(candidate_id)
     except ValueError as err:
-        message = f"unknown candidate: {candidate_id}"
+        valid = ", ".join(c.value for c in CANDIDATES)
+        message = f"unknown candidate: {candidate_id} (valid: {valid})"
         raise InvalidCandidateError(message) from err
     return CANDIDATES[key]
 

@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     )
 
     fal_key: str = ""
+    tryon_adapter: str = "fashn_v1_6"
+    tryon_timeout_s: float = 120.0
+    resize_cache_dir: str = "output/cache/resized"
 
 
 def load_settings() -> Settings:
