@@ -21,6 +21,7 @@ import fal_client
 from pydantic import TypeAdapter
 
 from ai.adapters.base import (
+    InputBudget,
     MissingApiKeyError,
     ProviderCallError,
     TryOnRequest,
@@ -96,6 +97,7 @@ class FalTryOnAdapter:
     name: ClassVar[str]
     model_id: ClassVar[str]
     price_per_generation_usd: ClassVar[float]
+    input_budget: ClassVar[InputBudget]
 
     _gateway: FalGateway
     _key: str | None

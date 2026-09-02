@@ -16,10 +16,16 @@ from __future__ import annotations
 
 from typing import ClassVar, Final, final, override
 
+from ai.adapters.base import InputBudget
 from ai.adapters.fal import FalTryOnAdapter, JsonValue
 
 FLUX_VTO_MODEL_ID: Final = "fal-ai/flux-pro/v1/vto"
 FLUX_PRICE_PER_GENERATION_USD: Final = 0.0475
+FLUX_PERSON_MAX_MP: Final = 2.0
+FLUX_GARMENT_MAX_MP: Final = 1.0
+FLUX_INPUT_BUDGET: Final = InputBudget(
+    person=FLUX_PERSON_MAX_MP, garment=FLUX_GARMENT_MAX_MP
+)
 DEFAULT_PROMPT: Final = (
     "A natural front-facing studio photo of the person wearing the garment."
 )
@@ -32,6 +38,7 @@ class FluxVtoAdapter(FalTryOnAdapter):
     name: ClassVar[str] = "flux_vto"
     model_id: ClassVar[str] = FLUX_VTO_MODEL_ID
     price_per_generation_usd: ClassVar[float] = FLUX_PRICE_PER_GENERATION_USD
+    input_budget: ClassVar[InputBudget] = FLUX_INPUT_BUDGET
 
     @override
     def _build_arguments(

@@ -58,12 +58,24 @@ class TryOnResult:
     image_url: str
 
 
+@dataclass(frozen=True, slots=True)
+class InputBudget:
+    """Maximum input megapixels per role; None = no documented limit.
+
+    Providers express limits in megapixels (1 MP = 1,000,000 px).
+    """
+
+    person: float | None
+    garment: float | None
+
+
 @runtime_checkable
 class TryOnAdapter(Protocol):
     """The contract every try-on provider implements."""
 
     name: ClassVar[str]
     price_per_generation_usd: ClassVar[float]
+    input_budget: ClassVar[InputBudget]
 
     def try_on(self, request: TryOnRequest) -> Awaitable[TryOnResult]:
         """Generate a try-on image; raises a subclass of AdapterError on failure."""

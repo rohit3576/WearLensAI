@@ -13,10 +13,12 @@ from __future__ import annotations
 
 from typing import ClassVar, Final, final, override
 
+from ai.adapters.base import InputBudget
 from ai.adapters.fal import FalTryOnAdapter, JsonValue
 
 FASHN_V1_6_MODEL_ID: Final = "fal-ai/fashn/tryon/v1.6"
 FASHN_PRICE_PER_GENERATION_USD: Final = 0.075
+FASHN_INPUT_BUDGET: Final = InputBudget(person=None, garment=None)
 
 
 @final
@@ -26,6 +28,7 @@ class FashnV16Adapter(FalTryOnAdapter):
     name: ClassVar[str] = "fashn_v1_6"
     model_id: ClassVar[str] = FASHN_V1_6_MODEL_ID
     price_per_generation_usd: ClassVar[float] = FASHN_PRICE_PER_GENERATION_USD
+    input_budget: ClassVar[InputBudget] = FASHN_INPUT_BUDGET
 
     @override
     def _build_arguments(
