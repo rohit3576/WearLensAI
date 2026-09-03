@@ -24,6 +24,7 @@ Person photo + Garment image → VTON model → Result + before/after slider
 | Try-on | FASHN v1.6 / FLUX VTO via fal.ai (API-first) · FASHN v1.5 self-host (Apache-2.0) |
 | Data | Neon Postgres · Cloudflare R2 |
 | Hosting | Vercel · Modal |
+| MCP | Model Context Protocol server over the same engine seams — [docs/mcp.md](docs/mcp.md) |
 
 Runs on free tiers end-to-end — the whole demo costs $0/month.
 
