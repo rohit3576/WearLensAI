@@ -52,6 +52,12 @@ Button, Card, Input, Skeleton, Dialog, etc. Custom components live in
   button (`bg-primary`, h-11, `rounded-md`) + requirement hint. Owns the
   sonner `<Toaster position="top-center">` — it lives in this island, not
   the root layout, so routes without toasts ship no toaster JS.
+- **CropStep** (`components/upload/`): person framing card — `rounded-xl
+  border bg-card` with an aspect-[4/5] `overflow-hidden` frame (`cursor-grab`,
+  `touch-none`), pointer-drag + 44px zoom buttons (Lucide zoom icons),
+  "Skip crop" outline / "Use photo" primary buttons. Transform-only motion
+  (`translate`/`scale`); the canvas export crops exactly what the frame
+  shows (pure math in `crop-math.ts`).
 - **ResultSlider** (`components/tryon/`): full-width `react-compare-slider`
   in a `rounded-xl border` box with server-known `aspect-ratio`; labels
   "Before"/"After" in `text-xs uppercase tracking-wide` chips

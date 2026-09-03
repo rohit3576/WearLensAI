@@ -2,20 +2,27 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import ky from "ky";
 import { toast } from "sonner";
 import { ImageDropzone } from "./image-dropzone";
 
-const { postMock, httpErrorClass } = vi.hoisted(() => {
+const { uploadMock, httpErrorClass } = vi.hoisted(() => {
   class HTTPError extends Error {
     constructor(public response: Response) {
       super("http error");
     }
   }
-  return { postMock: vi.fn(), httpErrorClass: HTTPError };
+  return { uploadMock: vi.fn(), httpErrorClass: HTTPError };
 });
 
-vi.mock("ky", () => ({ default: { post: postMock }, HTTPError: httpErrorClass }));
+vi.mock("ky", () => ({ HTTPError: httpErrorClass }));
+vi.mock("@/lib/upload-client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/upload-client")>();
+  return {
+    ...original,
+    uploadImage: uploadMock,
+    uploadErrorMessage: vi.fn(async () => "person.png: not a decodable image"),
+  };
+});
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 const validFile = new File([new Uint8Array([1, 2, 3])], "person.png", { type: "image/png" });
@@ -30,11 +37,6 @@ function drop(file: File): void {
   });
 }
 
-/** Mirrors ky's thenable response: a promise with .json() attached synchronously. */
-function kyResponse(data: unknown): Promise<unknown> & { json: () => Promise<unknown> } {
-  return Object.assign(Promise.resolve(undefined), { json: async () => data });
-}
-
 beforeAll(() => {
   Object.defineProperty(URL, "createObjectURL", {
     value: vi.fn(() => "blob:preview"),
@@ -45,7 +47,7 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
-  postMock.mockReset();
+  uploadMock.mockReset();
   vi.unstubAllGlobals();
 });
 
@@ -68,9 +70,7 @@ describe("ImageDropzone", () => {
 
   it("uploads a valid file and reports the stored image", async () => {
     vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 800, height: 1000 }));
-    postMock.mockReturnValue(
-      kyResponse({ url: "/api/files/a.png", width: 800, height: 1000 }),
-    );
+    uploadMock.mockResolvedValue({ url: "/api/files/a.png", width: 800, height: 1000 });
     const onUploaded = vi.fn();
     render(<ImageDropzone role="person" label="Your photo" onUploaded={onUploaded} />);
 
@@ -83,9 +83,31 @@ describe("ImageDropzone", () => {
         height: 1000,
       });
     });
+    expect(uploadMock).toHaveBeenCalledWith(validFile, "person");
     expect(screen.getByAltText("Your photo preview")).toBeInTheDocument();
     expect(screen.getByText("800x1000")).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("hands a validated file to the parent instead of uploading when asked", async () => {
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 800, height: 1000 }));
+    const onFileValidated = vi.fn();
+    render(
+      <ImageDropzone
+        role="person"
+        label="Your photo"
+        onUploaded={vi.fn()}
+        onFileValidated={onFileValidated}
+      />,
+    );
+
+    drop(validFile);
+
+    await waitFor(() => {
+      expect(onFileValidated).toHaveBeenCalledWith(validFile);
+    });
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(screen.queryByAltText("Your photo preview")).toBeNull();
   });
 
   it("toasts and skips upload when the type is rejected", async () => {
@@ -97,7 +119,7 @@ describe("ImageDropzone", () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("unsupported format"));
     });
-    expect(ky.post).not.toHaveBeenCalled();
+    expect(uploadMock).not.toHaveBeenCalled();
     expect(onUploaded).not.toHaveBeenCalled();
   });
 
@@ -109,17 +131,17 @@ describe("ImageDropzone", () => {
     drop(validFile);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("shortest side must be >= 256px"));
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining("shortest side must be >= 256px"),
+      );
     });
-    expect(ky.post).not.toHaveBeenCalled();
+    expect(uploadMock).not.toHaveBeenCalled();
   });
 
-  it("toasts the server reason on a 422 response", async () => {
+  it("toasts the server reason on an upload failure", async () => {
     vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 800, height: 1000 }));
-    postMock.mockImplementation(() => {
-      throw new httpErrorClass(
-        new Response(JSON.stringify({ error: "person.png: not a decodable image" }), { status: 422 }),
-      );
+    uploadMock.mockImplementation(() => {
+      throw new httpErrorClass(new Response("{}", { status: 422 }));
     });
     const onUploaded = vi.fn();
     render(<ImageDropzone role="person" label="Your photo" onUploaded={onUploaded} />);

@@ -57,12 +57,21 @@ test("visual qa across breakpoints and states", async ({ page }) => {
       'div[aria-label="Your photo dropzone"] input[type="file"]',
       personFile,
     );
+    await expect(page.getByText("Frame your photo")).toBeVisible();
+    await assertCropFrameRatio(page);
+    await page.screenshot({
+      path: `.data/qa/crop-${width.toString()}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Use photo" }).click();
+    await expect(page.getByText("Frame your photo")).toBeHidden();
+
     await page.setInputFiles(
       'div[aria-label="Garment dropzone"] input[type="file"]',
       garmentFile,
     );
-    await expect(page.getByText("800x1000", { exact: true })).toBeVisible();
-    await assertPreviewSquare(page, "Your photo dropzone");
+    await expect(page.getByText("300x300", { exact: true })).toBeVisible();
+    await assertPreviewSquare(page, "Garment dropzone");
     await page.screenshot({
       path: `.data/qa/upload-filled-${width.toString()}.png`,
       fullPage: true,
@@ -118,4 +127,16 @@ async function assertPreviewSquare(
   expect(box).not.toBeNull();
   if (box === null) return;
   expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(2);
+}
+
+/** The crop frame renders at the 4:5 output aspect. */
+async function assertCropFrameRatio(page: import("@playwright/test").Page): Promise<void> {
+  const frame = page
+    .getByAltText("Your photo, drag to frame")
+    .locator("..");
+  const box = await frame.boundingBox();
+  expect(box).not.toBeNull();
+  if (box === null) return;
+  expect(box.width / box.height).toBeGreaterThan(0.75);
+  expect(box.width / box.height).toBeLessThan(0.85);
 }

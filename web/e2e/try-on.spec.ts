@@ -51,7 +51,9 @@ test("upload both images, receive the stub result, see the before/after slider",
     'div[aria-label="Your photo dropzone"] input[type="file"]',
     personFile,
   );
-  await expect(page.getByText("800x1000", { exact: true })).toBeVisible();
+  await expect(page.getByText("Frame your photo")).toBeVisible();
+  await page.getByRole("button", { name: "Use photo" }).click();
+  await expect(page.getByText("Frame your photo")).toBeHidden();
 
   await page.setInputFiles(
     'div[aria-label="Garment dropzone"] input[type="file"]',

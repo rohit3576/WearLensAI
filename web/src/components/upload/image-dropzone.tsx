@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import ky, { HTTPError } from "ky";
+import { HTTPError } from "ky";
 import { toast } from "sonner";
-import { z } from "zod";
+import { uploadErrorMessage, uploadImage } from "@/lib/upload-client";
+import type { UploadedImage } from "@/lib/upload-client";
 import {
   ALLOWED_EXTENSIONS,
   MAX_EDGE_PX,
@@ -20,24 +21,12 @@ const ACCEPTED_TYPES = {
   "image/webp": [".webp"],
 } as const;
 
-const UploadResponseSchema = z.object({
-  url: z.string(),
-  width: z.number(),
-  height: z.number(),
-});
-
-const ErrorResponseSchema = z.object({ error: z.string() });
-
-export interface UploadedImage {
-  readonly url: string;
-  readonly width: number;
-  readonly height: number;
-}
-
 export interface ImageDropzoneProps {
   readonly role: UploadRole;
   readonly label: string;
   readonly onUploaded: (image: UploadedImage) => void;
+  /** Hand-off mode: validated files go to the parent instead of uploading here. */
+  readonly onFileValidated?: (file: File) => void;
 }
 
 async function imageDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -58,7 +47,7 @@ function rejectionReason(code: string): string {
   }
 }
 
-export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
+export function ImageDropzone({ role, label, onUploaded, onFileValidated }: ImageDropzoneProps) {
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
   const [dims, setDims] = useState<
     { readonly width: number; readonly height: number } | undefined
@@ -101,21 +90,20 @@ export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
         return;
       }
 
+      if (onFileValidated !== undefined) {
+        onFileValidated(file);
+        return;
+      }
+
       setUploading(true);
       setPreviewUrl(URL.createObjectURL(file));
-      const body = new FormData();
-      body.append("file", file);
-      body.append("role", role);
       try {
-        const response = UploadResponseSchema.parse(
-          await ky.post("/api/upload", { body }).json(),
-        );
+        const response = await uploadImage(file, role);
         setDims({ width: response.width, height: response.height });
         onUploaded(response);
       } catch (error) {
         if (error instanceof HTTPError) {
-          const parsed = ErrorResponseSchema.safeParse(await error.response.json().catch(() => null));
-          toast.error(parsed.success ? parsed.data.error : "upload failed");
+          toast.error(await uploadErrorMessage(error));
           return;
         }
         throw error;
@@ -123,7 +111,7 @@ export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
         setUploading(false);
       }
     },
-    [role, onUploaded],
+    [role, onUploaded, onFileValidated],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
