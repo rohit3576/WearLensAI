@@ -6,10 +6,21 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { submitTryOn, tryOnResult, tryOnStatus } from "./handlers";
 import { getRuntime } from "../src/lib/runtime";
 
 export const SERVER_NAME = "wearlens-tryon" as const;
 export const SERVER_VERSION = "0.1.0" as const;
+
+function toolResult(result: { readonly ok: boolean }): {
+  content: [{ type: "text"; text: string }];
+  isError?: boolean;
+} {
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    ...(result.ok ? {} : { isError: true }),
+  };
+}
 
 export function createMcpServer(): McpServer {
   getRuntime();
@@ -27,10 +38,7 @@ export function createMcpServer(): McpServer {
         garment_path: z.string().describe("Absolute path to the garment image (jpg/png/webp)"),
       },
     },
-    () => ({
-      content: [{ type: "text", text: "not implemented yet (wired in step 2)" }],
-      isError: true,
-    }),
+    async (args) => toolResult(await submitTryOn(args)),
   );
 
   server.registerTool(
@@ -42,10 +50,7 @@ export function createMcpServer(): McpServer {
         job_id: z.string().describe("The job id returned by submit_try_on"),
       },
     },
-    () => ({
-      content: [{ type: "text", text: "not implemented yet (wired in step 2)" }],
-      isError: true,
-    }),
+    async (args) => toolResult(await tryOnStatus(args)),
   );
 
   server.registerTool(
@@ -57,10 +62,7 @@ export function createMcpServer(): McpServer {
         job_id: z.string().describe("The job id returned by submit_try_on"),
       },
     },
-    () => ({
-      content: [{ type: "text", text: "not implemented yet (wired in step 2)" }],
-      isError: true,
-    }),
+    async (args) => toolResult(await tryOnResult(args)),
   );
 
   return server;
