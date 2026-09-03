@@ -12,13 +12,32 @@ test.beforeAll(async () => {
   personFile = path.join(dir, "person.png");
   garmentFile = path.join(dir, "garment.png");
   await sharp({
-    create: { width: 800, height: 1000, channels: 3, background: "#7890a0" },
+    create: { width: 800, height: 1000, channels: 3 as const, background: "#3a3f4a" },
   })
+    .composite([
+      {
+        input: { create: { width: 160, height: 160, channels: 3 as const, background: "#c88b78" } },
+        left: 320,
+        top: 80,
+      },
+      {
+        input: { create: { width: 400, height: 350, channels: 3 as const, background: "#565d6b" } },
+        left: 200,
+        top: 500,
+      },
+    ])
     .png()
     .toFile(personFile);
   await sharp({
-    create: { width: 300, height: 300, channels: 3, background: "#c85050" },
+    create: { width: 300, height: 300, channels: 3 as const, background: "#e8e4de" },
   })
+    .composite([
+      {
+        input: { create: { width: 150, height: 180, channels: 3 as const, background: "#2f5d8f" } },
+        left: 75,
+        top: 60,
+      },
+    ])
     .png()
     .toFile(garmentFile);
 });

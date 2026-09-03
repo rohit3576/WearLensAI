@@ -50,11 +50,20 @@ afterEach(() => {
 });
 
 describe("ImageDropzone", () => {
-  it("renders its label and browse hint", () => {
+  it("renders its label, role-specific hint, and browse hint", () => {
     render(<ImageDropzone role="person" label="Your photo" onUploaded={vi.fn()} />);
 
     expect(screen.getByText("Your photo")).toBeInTheDocument();
+    expect(screen.getByText("Front-facing photo, full upper body visible")).toBeInTheDocument();
     expect(screen.getByText(/click to browse/i)).toBeInTheDocument();
+  });
+
+  it("shows the garment hint for the garment role", () => {
+    render(<ImageDropzone role="garment" label="Garment" onUploaded={vi.fn()} />);
+
+    expect(
+      screen.getByText("Front-facing clothing on a plain background"),
+    ).toBeInTheDocument();
   });
 
   it("uploads a valid file and reports the stored image", async () => {

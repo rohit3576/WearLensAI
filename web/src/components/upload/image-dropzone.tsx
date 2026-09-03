@@ -10,6 +10,7 @@ import {
   MAX_EDGE_PX,
   MAX_UPLOAD_BYTES,
   MIN_EDGE_PX,
+  ROLE_HINTS,
 } from "@/lib/upload-rules";
 import type { UploadRole } from "@/lib/upload-rules";
 
@@ -136,6 +137,7 @@ export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium">{label}</span>
+      <span className="text-xs text-muted-foreground">{ROLE_HINTS[role]}</span>
       <div
         {...getRootProps({
           role: "button",

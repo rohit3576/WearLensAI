@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ImageValidationError, validateUploadImage } from "@/lib/image-validation";
+import { runPreflight } from "@/lib/preflight/checks";
 import { resolveStorage } from "@/lib/storage";
 import { UPLOAD_ROLES } from "@/lib/upload-rules";
 
@@ -30,6 +31,18 @@ export async function POST(request: Request): Promise<Response> {
   const bytes = Buffer.from(await file.arrayBuffer());
   try {
     const image = await validateUploadImage({ bytes, fileName: file.name });
+    const preflight = await runPreflight(role.data, {
+      bytes: image.bytes,
+      width: image.width,
+      height: image.height,
+      contentType: image.contentType,
+    });
+    if (!preflight.ok) {
+      return Response.json(
+        { error: preflight.rejection.reason, code: preflight.rejection.code },
+        { status: 422 },
+      );
+    }
     const url = await resolveStorage(process.env).put({
       bytes,
       contentType: image.contentType,

@@ -22,3 +22,8 @@ export type AllowedExtension = (typeof ALLOWED_EXTENSIONS)[number];
 export const UPLOAD_ROLES = ["person", "garment"] as const;
 
 export type UploadRole = (typeof UPLOAD_ROLES)[number];
+
+export const ROLE_HINTS = {
+  person: "Front-facing photo, full upper body visible",
+  garment: "Front-facing clothing on a plain background",
+} as const;
