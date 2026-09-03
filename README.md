@@ -9,12 +9,25 @@
 Upload your photo + a garment image → get a realistic AI try-on result.
 
 ```text
-Person photo + Garment image → VTON model → Result + before/after slider
+Person photo (crop + preflight) + Garment image → VTON engine → live job lifecycle (SSE) → result + before/after slider
 ```
+
+Every input passes a preflight quality gate — bad photos die with actionable
+messages before any API credit burns.
 
 ## Architecture
 
-<!-- architecture diagram placeholder (Phase 10) -->
+Every external dependency sits behind a seam, so the whole product builds,
+tests, and demos offline against fakes and stubs — live services flip with
+env vars, no code changes.
+
+```text
+web app (Next.js) ─┬─ POST /api/upload ── window validation → preflight → Storage (local │ R2)
+                   ├─ POST /api/try-on ─ TryOnEngine (stub │ fal) → JobStore (sqlite │ Neon)
+                   └─ GET  /status (SSE) → done → /api/results/<id>.png
+MCP server ──────── same seams (runtime.ts) → submit / status / result tools
+ai/ (Python) ────── benchmark + batch inference over the same fal adapters
+```
 
 ## Stack
 
@@ -31,10 +44,10 @@ Runs on free tiers end-to-end — the whole demo costs $0/month.
 ## Roadmap
 
 - [x] Phase 0 — repo bootstrap
-- [ ] Phase 1 — model benchmark
-- [ ] Phase 2 — inference pipeline
-- [ ] Phase 3 — web app MVP
-- [ ] Phase 4 — quality & safety layer
+- [x] Phase 1 — model benchmark (build done; paid run parked for API budget)
+- [x] Phase 2 — inference pipeline (build done; live proof parked)
+- [x] Phase 3 — web app MVP (deploy step parked for free-tier accounts)
+- [x] Phase 4 — quality & safety layer
 - [ ] Phase 5 — evaluation (200 try-ons)
 - [ ] Phase 10 — deploy + launch
 
@@ -44,10 +57,11 @@ Amazon/Flipkart integration, browser extension, body measurements, size predicti
 
 ## Quickstart
 
-Arrives with Phase 1.
-
 - Python (benchmark + inference): `uv sync && uv run pytest` — see `ai/`
-- Web app: `cd web && pnpm install && pnpm dev` — see `web/`
+- Web app (upload → crop → SSE lifecycle → before/after slider):
+  `cd web && pnpm install && pnpm build && pnpm start`
+- Tests: `cd web && pnpm test` (unit) · `pnpm test:e2e` (Playwright) · `uv run pytest` (Python)
+- MCP server for AI agents: `pnpm -C web mcp` — wiring guide in [docs/mcp.md](docs/mcp.md)
 
 ## License
 
