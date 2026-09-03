@@ -14,6 +14,13 @@ await build({
 });
 
 await build({
+  entryPoints: ["src/detect-in-page.ts"],
+  bundle: true,
+  format: "iife",
+  outfile: "dist/detect-in-page.js",
+});
+
+await build({
   entryPoints: ["src/panel/mount.tsx"],
   bundle: true,
   format: "esm",

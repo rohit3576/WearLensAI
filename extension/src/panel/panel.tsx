@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ky from "ky";
 import { z } from "zod";
+import { TryOnFlow } from "./flow";
 import "./panel.css";
 
 export const DEFAULT_API_BASE = "http://localhost:3000" as const;
@@ -109,10 +110,14 @@ export function Panel() {
           </button>
         </div>
       </section>
-      <p className="hint">
-        Garment detection and the try-on flow arrive in the next build. This
-        shell checks the backend and remembers where yours runs.
-      </p>
+      {health.state === "ok" ? (
+        <TryOnFlow apiBase={apiBase} />
+      ) : (
+        <p className="hint">
+          Set the backend URL above and save — the try-on flow starts once the
+          backend answers.
+        </p>
+      )}
     </main>
   );
 }

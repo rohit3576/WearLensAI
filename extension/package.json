@@ -23,6 +23,7 @@
   "dependencies": {
     "ky": "^2.1.0",
     "react": "^19.2.8",
+    "react-compare-slider": "^4.0.0",
     "react-dom": "^19.2.8",
     "zod": "^4.5.4"
   }
