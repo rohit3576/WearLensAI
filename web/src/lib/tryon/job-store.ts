@@ -5,7 +5,7 @@
  * see neon-job-store.ts. Fields per plan: id, status, person_url,
  * garment_url, result_url, created_at, completed_at (no users table).
  */
-import { mkdir } from "node:fs/promises";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { JobId, JobStatus, SubmitTryOn } from "./engine";
@@ -54,12 +54,12 @@ export class SqliteJobStore implements JobStore {
 
   constructor(config: SqliteJobStoreConfig) {
     this.dbPath = config.dbPath;
+    mkdirSync(path.dirname(config.dbPath), { recursive: true });
     this.db = new DatabaseSync(config.dbPath);
     this.db.exec(CREATE_TABLE);
   }
 
   async create(jobId: JobId, input: SubmitTryOn): Promise<void> {
-    await mkdir(path.dirname(this.dbPath), { recursive: true });
     this.db
       .prepare(
         "INSERT INTO tryon_jobs (id, phase, person_url, garment_url, created_at) VALUES (?, 'queued', ?, ?, ?)",
