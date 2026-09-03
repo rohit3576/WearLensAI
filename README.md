@@ -56,6 +56,7 @@ wearing **that** garment, side by side with the original. No coin flip.
 | **A seller or indie brand** | A try-on experience you can host yourself, on free tiers — no per-image SaaS tax, and your product images stay in your stack |
 | **A developer** | An MIT-licensed, seam-first codebase where every external service has an offline twin — fork it, test it for $0, flip env vars to go live |
 | **An AI agent builder** | A ready-made MCP server: your agent can drive the entire try-on pipeline (submit, poll, fetch results) as three tool calls — [docs/mcp.md](docs/mcp.md) |
+| **A shopper on any store** | The browser extension (building): it spots the garment on a product page and shows it on your photo — no store integration needed |
 
 ## Why this one is different
 
@@ -138,11 +139,20 @@ uv run pytest                          # 45 Python tests
 
 Runs on free tiers end-to-end — the hosted demo costs $0/month.
 
+## The browser extension (building now)
+
+The zero-integration path for shoppers — and the fastest way for a store to
+offer try-on without touching their codebase. The extension detects the
+garment image on any fashion product page (JSON-LD → og:image → gallery
+heuristics), the shopper picks their photo once, and the before/after
+result renders in the side panel. Store owners and devs can point it at
+their own WearLensAI deployment — the same API this repo ships.
+
 ## Not in scope (yet)
 
-Amazon/Flipkart integration, browser extension, body measurements, size
-prediction, AI shopping agent, recommendations, mobile app, training custom
-models. One thing at a time.
+Amazon/Flipkart deep integration, body measurements, size prediction, AI
+shopping agent, recommendations, mobile app, training custom models. One
+thing at a time.
 
 ## License
 
