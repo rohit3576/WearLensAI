@@ -20,9 +20,11 @@ CSS-variable tokens defined in `src/app/globals.css`.
   `secondary`, `muted`, `accent`, `destructive`, `border`, `ring`. Never raw
   hex/oklch values in components. The result image is the only saturated
   content on screen; chrome stays grayscale.
-- **Typography**: Geist Sans (`--font-sans`) for everything, Geist Mono
-  (`--font-geist-mono`) for IDs/numbers. Scale: `text-sm` body,
-  `text-lg font-medium` card titles, `text-2xl md:text-3xl` page titles.
+- **Typography**: Geist Sans (`--font-sans`, `font-display: optional` — preloaded
+  and self-hosted; throttled first views fall back to the metric-adjusted
+  system font with zero shift). Geist Mono reserved for future ID/number
+  surfaces — not loaded until something uses `font-mono`. Scale: `text-sm`
+  body, `text-lg font-medium` card titles, `text-2xl md:text-3xl` page titles.
 - **Radius**: token-driven (`--radius-sm` … `--radius-4xl`); cards use
   `rounded-xl`, inputs/buttons follow their shadcn component defaults.
 - **Spacing**: 4px base grid. Page sections gap-6 md:gap-8; card padding
@@ -46,11 +48,20 @@ Button, Card, Input, Skeleton, Dialog, etc. Custom components live in
   state = `border-primary bg-muted/40`; below it a preview tile with the
   image (`object-contain`, aspect-square, `rounded-lg border`) and its
   filename + dimensions in `text-xs text-muted-foreground`.
-- **Compare slider** (Step 5, `react-compare-slider`): full-width result,
-  labels "Before"/"After" in `text-xs uppercase tracking-wide` chips.
-- **Status display** (Step 5): rotating plain-text status messages + Skeleton
-  loader matching the result aspect ratio. Progress bars are forbidden —
-  we do not know real progress; never fake it.
+- **UploadFlow** (`components/upload/`): the two dropzones + one primary
+  button (`bg-primary`, h-11, `rounded-md`) + requirement hint. Owns the
+  sonner `<Toaster position="top-center">` — it lives in this island, not
+  the root layout, so routes without toasts ship no toaster JS.
+- **ResultSlider** (`components/tryon/`): full-width `react-compare-slider`
+  in a `rounded-xl border` box with server-known `aspect-ratio`; labels
+  "Before"/"After" in `text-xs uppercase tracking-wide` chips
+  (`rounded-full bg-background/90`) pinned to the top corners.
+- **ProcessingPanel** (`components/tryon/`): pulse skeleton block matching
+  the result aspect + a rotating plain-text status message (`aria-live`,
+  fade-in on rotation). Progress bars are forbidden — we do not know real
+  progress; never fake it.
+- **Status cards** (`Shell`): `rounded-xl border bg-card p-6` with title,
+  muted message, and an outlined `h-11` link-button for recovery paths.
 
 ## Feedback
 

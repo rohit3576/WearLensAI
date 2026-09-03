@@ -4,6 +4,8 @@
  */
 import { z } from "zod";
 
+export type JobPhase = "queued" | "processing" | "done" | "failed";
+
 export type StatusEvent =
   | { readonly phase: "queued" }
   | { readonly phase: "processing" }

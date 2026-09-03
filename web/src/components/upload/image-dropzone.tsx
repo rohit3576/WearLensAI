@@ -59,7 +59,9 @@ function rejectionReason(code: string): string {
 
 export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
-  const [meta, setMeta] = useState<string | undefined>(undefined);
+  const [dims, setDims] = useState<
+    { readonly width: number; readonly height: number } | undefined
+  >(undefined);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -107,7 +109,7 @@ export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
         const response = UploadResponseSchema.parse(
           await ky.post("/api/upload", { body }).json(),
         );
-        setMeta(`${response.width}x${response.height}`);
+        setDims({ width: response.width, height: response.height });
         onUploaded(response);
       } catch (error) {
         if (error instanceof HTTPError) {
@@ -149,15 +151,23 @@ export function ImageDropzone({ role, label, onUploaded }: ImageDropzoneProps) {
             Drag an image here, or click to browse (jpg, png, webp)
           </p>
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- in-memory blob preview; next/image optimization cannot apply to object URLs
-          <img
-            src={previewUrl}
-            alt={`${label} preview`}
-            className="mx-auto max-h-64 object-contain"
-          />
+          <div className="mx-auto aspect-square w-full max-w-64 overflow-hidden rounded-lg border bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element -- in-memory blob preview; next/image optimization cannot apply to object URLs */}
+            <img
+              src={previewUrl}
+              alt={`${label} preview`}
+              width={dims?.width}
+              height={dims?.height}
+              className="h-full w-full object-contain"
+            />
+          </div>
         )}
       </div>
-      {meta !== undefined ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
+      {dims !== undefined ? (
+        <span className="text-xs text-muted-foreground">
+          {dims.width}x{dims.height}
+        </span>
+      ) : null}
     </div>
   );
 }
