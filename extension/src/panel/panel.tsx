@@ -63,9 +63,17 @@ export function Panel() {
   const [apiBase, setApiBase] = useState<string>(DEFAULT_API_BASE);
   const [health, setHealth] = useState<HealthState>({ state: "checking" });
   const [saving, setSaving] = useState(false);
+  const [pendingGarment, setPendingGarment] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     void (async () => {
+      const session = (globalThis as { chrome?: typeof chrome }).chrome?.storage?.session;
+      const stored = session === undefined ? undefined : await session.get(["pendingGarment"]);
+      const staged = stored?.["pendingGarment"];
+      if (typeof staged === "string" && staged !== "") {
+        await session?.set({ pendingGarment: "" });
+        setPendingGarment(staged);
+      }
       const saved = await readSavedApiBase();
       setApiBase(saved);
       setHealth(await checkHealth(saved));
@@ -111,7 +119,7 @@ export function Panel() {
         </div>
       </section>
       {health.state === "ok" ? (
-        <TryOnFlow apiBase={apiBase} />
+        <TryOnFlow apiBase={apiBase} {...(pendingGarment === undefined ? {} : { initialGarment: pendingGarment })} />
       ) : (
         <p className="hint">
           Set the backend URL above and save — the try-on flow starts once the

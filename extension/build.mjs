@@ -21,6 +21,13 @@ await build({
 });
 
 await build({
+  entryPoints: ["src/content.ts"],
+  bundle: true,
+  format: "iife",
+  outfile: "dist/content.js",
+});
+
+await build({
   entryPoints: ["src/panel/mount.tsx"],
   bundle: true,
   format: "esm",

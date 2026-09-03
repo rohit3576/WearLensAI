@@ -124,4 +124,21 @@ describe("TryOnFlow", () => {
       expect(screen.getByText(/No garment images detected/)).toBeInTheDocument();
     });
   });
+
+  it("skips scanning when a garment was staged by the badge click", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pick your photo once/)).toBeInTheDocument();
+    });
+    expect(candidatesMock).not.toHaveBeenCalled();
+  });
 });

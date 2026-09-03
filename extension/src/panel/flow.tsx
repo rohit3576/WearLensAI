@@ -24,9 +24,11 @@ type Stage =
 
 export interface TryOnFlowProps {
   readonly apiBase: string;
+  /** Pre-selected garment (badge click) — skips scanning straight to setup. */
+  readonly initialGarment?: string;
 }
 
-export function TryOnFlow({ apiBase }: TryOnFlowProps) {
+export function TryOnFlow({ apiBase, initialGarment }: TryOnFlowProps) {
   const [stage, setStage] = useState<Stage>({ kind: "scanning" });
 
   const scan = useCallback(async () => {
@@ -40,8 +42,18 @@ export function TryOnFlow({ apiBase }: TryOnFlowProps) {
   }, []);
 
   useEffect(() => {
-    void scan();
-  }, [scan]);
+    if (initialGarment === undefined) {
+      void scan();
+      return;
+    }
+    void pickGarment({
+      src: initialGarment,
+      width: 0,
+      height: 0,
+      score: 0,
+      source: "gallery",
+    });
+  }, [scan, initialGarment]);
 
   async function startWithPerson(
     garment: GarmentCandidate,
