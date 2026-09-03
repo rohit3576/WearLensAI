@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "WearLensAI Try-On",
+  "version": "0.1.0",
+  "description": "See clothes on you before you buy — try-on from any product page.",
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Open WearLensAI try-on"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  }
+}
