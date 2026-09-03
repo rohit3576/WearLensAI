@@ -45,6 +45,9 @@ Amazon/Flipkart integration, browser extension, body measurements, size predicti
 
 Arrives with Phase 1.
 
+- Python (benchmark + inference): `uv sync && uv run pytest` — see `ai/`
+- Web app: `cd web && pnpm install && pnpm dev` — see `web/`
+
 ## License
 
 Code: MIT. Model weights keep their own licenses — see [MODEL_LICENSES.md](MODEL_LICENSES.md).
