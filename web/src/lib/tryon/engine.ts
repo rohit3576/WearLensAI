@@ -6,6 +6,7 @@
  * Selection: `TRYON_ENGINE` env (default "stub") via `resolveEngine`.
  */
 import { z } from "zod";
+import type { StatusEvent } from "./status";
 import { StubEngine, defaultStubConfig } from "./stub-engine";
 import type { StubEngineConfig } from "./stub-engine";
 
@@ -35,11 +36,9 @@ export const JOB_PHASES = ["queued", "processing", "done", "failed"] as const;
 
 export type JobPhase = (typeof JOB_PHASES)[number];
 
-export type JobStatus =
-  | { readonly phase: "queued" }
-  | { readonly phase: "processing" }
-  | { readonly phase: "done"; readonly resultUrl: string }
-  | { readonly phase: "failed"; readonly reason: string };
+export type JobStatus = StatusEvent;
+
+export type { StatusEvent } from "./status";
 
 export interface TryOnEngine {
   submit(input: SubmitTryOn): Promise<JobId>;

@@ -30,6 +30,10 @@ export interface StubEngineConfig {
   readonly failureMode: "never" | "always";
   /** Prefix for returned result URLs (a route mounts here in Step 4). */
   readonly resultUrlPrefix: string;
+  /** Maps engine-input URLs to readable paths (dev wiring; identity default). */
+  readonly resolveInputPath?: (url: string) => string;
+  /** Observes post-submit transitions: processing, done, failed (not queued). */
+  readonly onStatus?: (jobId: JobId, status: JobStatus) => void | Promise<void>;
 }
 
 export const defaultStubConfig: StubEngineConfig = {
@@ -96,36 +100,43 @@ export class StubEngine implements TryOnEngine {
   private async runLifecycle(jobId: JobId, job: StubJob): Promise<void> {
     await sleep(this.config.queuedDelayMs);
     job.status = { phase: "processing" };
+    await this.config.onStatus?.(jobId, job.status);
     await sleep(this.config.processingDelayMs);
     if (this.config.failureMode === "always") {
       job.status = { phase: "failed", reason: STUB_FAILURE_REASON };
+      await this.config.onStatus?.(jobId, job.status);
       return;
     }
     try {
       const resultUrl = await this.composite(jobId, job.input);
       job.status = { phase: "done", resultUrl };
+      await this.config.onStatus?.(jobId, job.status);
     } catch (error) {
       job.status = {
         phase: "failed",
         reason: error instanceof Error ? error.message : String(error),
       };
+      await this.config.onStatus?.(jobId, job.status);
     }
   }
 
   private async composite(jobId: JobId, input: SubmitTryOn): Promise<string> {
-    const meta = await sharp(input.personUrl).metadata();
+    const resolve = this.config.resolveInputPath;
+    const personUrl = resolve === undefined ? input.personUrl : resolve(input.personUrl);
+    const garmentUrl = resolve === undefined ? input.garmentUrl : resolve(input.garmentUrl);
+    const meta = await sharp(personUrl).metadata();
     if (meta.width === undefined || meta.height === undefined) {
       throw new Error(`cannot read dimensions of person image ${input.personUrl}`);
     }
     const garmentWidth = Math.round(meta.width * GARMENT_WIDTH_RATIO);
-    const garment = await sharp(input.garmentUrl)
+    const garment = await sharp(garmentUrl)
       .resize(garmentWidth)
       .tint(STUB_TINT)
       .png()
       .toBuffer();
     await mkdir(this.config.outputDir, { recursive: true });
     const fileName = `${jobId}.png`;
-    await sharp(input.personUrl)
+    await sharp(personUrl)
       .composite([
         {
           input: garment,

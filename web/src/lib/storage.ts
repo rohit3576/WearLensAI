@@ -8,9 +8,10 @@
  * consumers (StubEngine) resolve URLs back to paths via pathOf().
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { isStoredName, readImageFrom } from "./file-serving";
 import type { UploadRole } from "./upload-rules";
 
 export interface StoredUpload {
@@ -35,16 +36,7 @@ const EXTENSION_BY_CONTENT_TYPE = {
   "image/webp": ".webp",
 } as const;
 
-const CONTENT_TYPE_BY_EXTENSION = {
-  ".jpg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-} as const;
-
 const URL_PREFIX = "/api/files/" as const;
-
-/** /api/files/<name> with a strictly alphanumeric/dash/dot name. */
-const StoredNameSchema = z.string().regex(/^[a-z0-9-]+\.(jpg|png|webp)$/);
 
 export class LocalStorage implements Storage {
   private readonly uploadDir: string;
@@ -67,7 +59,7 @@ export class LocalStorage implements Storage {
       throw new Error(`not a local storage URL: ${url}`);
     }
     const name = url.slice(URL_PREFIX.length);
-    if (!StoredNameSchema.safeParse(name).success) {
+    if (!isStoredName(name)) {
       throw new Error(`refusing to resolve untrusted storage name: ${name}`);
     }
     return path.join(this.uploadDir, name);
@@ -75,15 +67,7 @@ export class LocalStorage implements Storage {
 
   /** Serve a stored file by name; null when unknown or the name is untrusted. */
   async read(name: string): Promise<{ bytes: Buffer; contentType: string } | null> {
-    if (!StoredNameSchema.safeParse(name).success) return null;
-    const extension = name.slice(name.lastIndexOf(".")) as keyof typeof CONTENT_TYPE_BY_EXTENSION;
-    try {
-      const bytes = await readFile(path.join(this.uploadDir, name));
-      return { bytes, contentType: CONTENT_TYPE_BY_EXTENSION[extension] };
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
-      throw error;
-    }
+    return readImageFrom(this.uploadDir, name);
   }
 }
 

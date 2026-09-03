@@ -205,4 +205,61 @@ describe("StubEngine", () => {
 
     expect(first.equals(second)).toBe(true);
   });
+
+  it("emits onStatus for each post-submit transition in order", async () => {
+    const events: string[] = [];
+    const engine = new StubEngine(
+      makeConfig({
+        onStatus: async (_jobId, status) => {
+          events.push(status.phase);
+        },
+      }),
+    );
+
+    const jobId = await engine.submit(input);
+    await settleToTerminal(engine, jobId);
+
+    expect(events).toStrictEqual(["processing", "done"]);
+  });
+
+  it("emits onStatus with failed when failure is injected", async () => {
+    const events: JobStatus[] = [];
+    const engine = new StubEngine(
+      makeConfig({
+        failureMode: "always",
+        onStatus: (_jobId, status) => {
+          events.push(status);
+        },
+      }),
+    );
+
+    const jobId = await engine.submit(input);
+    await settleToTerminal(engine, jobId);
+
+    expect(events).toStrictEqual([{ phase: "processing" }, { phase: "failed", reason: expect.any(String) }]);
+  });
+
+  it("reads inputs through resolveInputPath when configured", async () => {
+    let resolvedPerson = "";
+    const engine = new StubEngine(
+      makeConfig({
+        resolveInputPath: (url) => {
+          if (url === "/api/files/abc.png") {
+            resolvedPerson = url;
+            return input.personUrl;
+          }
+          return url;
+        },
+      }),
+    );
+
+    const jobId = await engine.submit({
+      personUrl: "/api/files/abc.png",
+      garmentUrl: input.garmentUrl,
+    });
+    const status = await settleToTerminal(engine, jobId);
+
+    expect(status.phase).toBe("done");
+    expect(resolvedPerson).toBe("/api/files/abc.png");
+  });
 });
