@@ -10,7 +10,8 @@ export default defineConfig({
   webServer: {
     command: "pnpm start",
     url: "http://localhost:3210",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
+    timeout: 60_000,
     env: {
       PORT: "3210",
       TRYON_STUB_QUEUED_MS: "150",
