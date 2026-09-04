@@ -5,8 +5,9 @@
  */
 import ky, { HTTPError } from "ky";
 import { z } from "zod";
+import type { RawPageContent } from "../lib/profile/raw";
+import { FitAdviceSchema, GarmentProfileSchema } from "../lib/profile/schema";
 import type { BodyProfile, FitAdvice, GarmentProfile } from "../lib/profile/schema";
-import { FitAdviceSchema } from "../lib/profile/schema";
 import type { StatusEvent } from "./status-events";
 
 const UploadResponseSchema = z.object({
@@ -58,6 +59,21 @@ export async function fitAdvice(
     .post(`${apiBase}/api/fit`, { json: { garment, body } })
     .json();
   return FitAdviceSchema.parse(response);
+}
+
+const NormalizeResponseSchema = z.object({
+  profile: GarmentProfileSchema.nullable(),
+});
+
+export async function normalizeProfile(
+  apiBase: string,
+  input: { sourceUrl: string; deterministic: GarmentProfile; raw: RawPageContent },
+): Promise<GarmentProfile | undefined> {
+  const response: unknown = await ky
+    .post(`${apiBase}/api/normalize`, { json: input })
+    .json();
+  const parsed = NormalizeResponseSchema.safeParse(response);
+  return parsed.success ? (parsed.data.profile ?? undefined) : undefined;
 }
 
 export async function fetchAsBlob(imageUrl: string): Promise<File> {

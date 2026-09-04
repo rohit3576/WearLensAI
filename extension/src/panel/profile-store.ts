@@ -1,12 +1,15 @@
 /**
- * Staged garment profile handoff (badge click → panel): read-and-clear
- * `pendingProfile` from chrome.storage.session. Corrupt staging degrades
- * to absent via safeParse — the panel never renders untrusted data.
+ * Staged pick handoff (badge click → panel): read-and-clear
+ * `pendingProfile` and `pendingRaw` from chrome.storage.session. Corrupt
+ * staging degrades to absent (profile via safeParse, raw via a minimal
+ * shape check) — the panel never renders untrusted data.
  */
+import type { RawPageContent } from "../lib/profile/raw";
 import { GarmentProfileSchema } from "../lib/profile/schema";
 import type { GarmentProfile } from "../lib/profile/schema";
 
 const STORAGE_KEY = "pendingProfile" as const;
+const RAW_KEY = "pendingRaw" as const;
 
 interface SessionStorageApi {
   get(keys: string[]): Promise<Record<string, unknown>>;
@@ -28,4 +31,18 @@ export async function takePendingProfile(): Promise<GarmentProfile | undefined> 
   if (value === undefined || value === null) return undefined;
   const parsed = GarmentProfileSchema.safeParse(value);
   return parsed.success ? parsed.data : undefined;
+}
+
+export async function takePendingRaw(): Promise<RawPageContent | undefined> {
+  const session = sessionOf();
+  if (session === undefined) return undefined;
+  const stored = await session.get([RAW_KEY]);
+  const value = stored[RAW_KEY];
+  await session.set({ [RAW_KEY]: undefined });
+  if (value === null || typeof value !== "object") return undefined;
+  const tables = (value as { tables?: unknown }).tables;
+  if (!Array.isArray(tables) || tables.some((entry) => typeof entry !== "string")) {
+    return undefined;
+  }
+  return value as RawPageContent;
 }

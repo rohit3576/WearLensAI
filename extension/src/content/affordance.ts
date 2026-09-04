@@ -1,5 +1,6 @@
 import { detectGarmentCandidates } from "../lib/detect";
 import { buildGarmentProfile } from "../lib/profile/extract";
+import { collectRawPageContent } from "../lib/profile/raw";
 import type { GarmentProfile } from "../lib/profile/schema";
 
 const BADGE_CLASS = "wearlens-try-badge" as const;
@@ -59,10 +60,12 @@ export function startAffordance(
 
   badge.addEventListener("click", () => {
     if (activeImage !== null) {
+      const url = doc.location?.href ?? doc.baseURI;
       hooks.sendMessage({
         type: PICK_MESSAGE,
         src: activeImage.src,
-        profile: buildGarmentProfile(doc, doc.location?.href ?? doc.baseURI),
+        profile: buildGarmentProfile(doc, url),
+        raw: collectRawPageContent(doc),
       });
     }
     badge.hidden = true;

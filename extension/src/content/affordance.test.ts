@@ -51,6 +51,7 @@ describe("startAffordance", () => {
       type: "wearlens:garment-picked",
       src: "https://cdn.store.test/model-worn.jpg",
       profile: undefined,
+      raw: { tables: [] },
     });
     expect(badge.hidden).toBe(true);
   });
@@ -92,6 +93,7 @@ describe("startAffordance", () => {
       type: "wearlens:garment-picked",
       src: "https://cdn.store.test/second-dress.jpg",
       profile: undefined,
+      raw: { tables: [] },
     });
   });
 

@@ -4,6 +4,7 @@ import { HTTPError } from "ky";
 import {
   fetchAsBlob,
   fitAdvice,
+  normalizeProfile,
   runTryOn,
   submitTryOn,
   uploadErrorMessage,
@@ -12,9 +13,11 @@ import {
 import { loadBodyProfile } from "./body-profile-store";
 import { CropStep } from "./crop-step";
 import { FitAdviceCard } from "./fit-advice";
+import { cachedProfile, cacheProfile } from "./normalize-cache";
 import { dataUrlToFile, fileToDataUrl, loadPersonPhoto, savePersonPhoto } from "./person-store";
 import { activeTabCandidates } from "./tab-candidates";
 import type { GarmentCandidate } from "../lib/detect";
+import type { RawPageContent } from "../lib/profile/raw";
 import type { FitAdvice, GarmentProfile } from "../lib/profile/schema";
 import type { StatusEvent } from "./status-events";
 
@@ -32,15 +35,52 @@ export interface TryOnFlowProps {
   readonly initialGarment?: string;
   /** What the badge click read from the page (brand · category · chart state). */
   readonly initialProfile?: GarmentProfile;
+  /** Raw page material for backend normalization when the pick found no chart. */
+  readonly initialRaw?: RawPageContent;
 }
 
-export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlowProps) {
+export function TryOnFlow({ apiBase, initialGarment, initialProfile, initialRaw }: TryOnFlowProps) {
   const [stage, setStage] = useState<Stage>({ kind: "scanning" });
+  const [profile, setProfile] = useState<GarmentProfile | undefined>(initialProfile);
   const [advice, setAdvice] = useState<FitAdvice | undefined>(undefined);
   const [needsBodyProfile, setNeedsBodyProfile] = useState(false);
 
   useEffect(() => {
-    if (initialProfile?.sizeChart === undefined) return;
+    if (
+      initialProfile === undefined ||
+      initialProfile.sizeChart !== undefined ||
+      initialRaw === undefined
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const cached = await cachedProfile(initialProfile.sourceUrl);
+      if (cached !== undefined) {
+        if (!cancelled) setProfile(cached);
+        return;
+      }
+      try {
+        const enriched = await normalizeProfile(apiBase, {
+          sourceUrl: initialProfile.sourceUrl,
+          deterministic: initialProfile,
+          raw: initialRaw,
+        });
+        if (!cancelled && enriched !== undefined) {
+          setProfile(enriched);
+          await cacheProfile(enriched);
+        }
+      } catch {
+        // Normalization is best-effort: failures leave the deterministic view.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, initialProfile, initialRaw]);
+
+  useEffect(() => {
+    if (profile?.sizeChart === undefined) return;
     let cancelled = false;
     void (async () => {
       const bodyProfile = await loadBodyProfile();
@@ -49,7 +89,7 @@ export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlow
         return;
       }
       try {
-        const result = await fitAdvice(apiBase, initialProfile, bodyProfile);
+        const result = await fitAdvice(apiBase, profile, bodyProfile);
         if (!cancelled) setAdvice(result);
       } catch {
         // Advice is best-effort: a backend hiccup never blocks try-on.
@@ -58,7 +98,7 @@ export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlow
     return () => {
       cancelled = true;
     };
-  }, [apiBase, initialProfile]);
+  }, [apiBase, profile]);
 
   const scan = useCallback(async () => {
     setStage({ kind: "scanning" });
@@ -124,7 +164,7 @@ export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlow
 
   return (
     <section className="flow" aria-label="Try-on flow">
-      {initialProfile !== undefined ? <ProfileLine profile={initialProfile} /> : null}
+      {profile !== undefined ? <ProfileLine profile={profile} /> : null}
       {advice !== undefined ? <FitAdviceCard advice={advice} /> : null}
       {needsBodyProfile ? (
         <p className="hint">Set your height in Your fit above for size advice.</p>

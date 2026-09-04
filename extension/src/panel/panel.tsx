@@ -3,8 +3,9 @@ import ky from "ky";
 import { z } from "zod";
 import { BodyProfileSection } from "./body-profile";
 import { TryOnFlow } from "./flow";
-import { takePendingProfile } from "./profile-store";
+import { takePendingProfile, takePendingRaw } from "./profile-store";
 import type { GarmentProfile } from "../lib/profile/schema";
+import type { RawPageContent } from "../lib/profile/raw";
 import "./panel.css";
 
 export const DEFAULT_API_BASE = "http://localhost:3000" as const;
@@ -68,6 +69,7 @@ export function Panel() {
   const [saving, setSaving] = useState(false);
   const [pendingGarment, setPendingGarment] = useState<string | undefined>(undefined);
   const [pendingProfile, setPendingProfile] = useState<GarmentProfile | undefined>(undefined);
+  const [pendingRaw, setPendingRaw] = useState<RawPageContent | undefined>(undefined);
 
   useEffect(() => {
     void (async () => {
@@ -79,6 +81,7 @@ export function Panel() {
         setPendingGarment(staged);
       }
       setPendingProfile(await takePendingProfile());
+      setPendingRaw(await takePendingRaw());
       const saved = await readSavedApiBase();
       setApiBase(saved);
       setHealth(await checkHealth(saved));
@@ -129,6 +132,7 @@ export function Panel() {
           apiBase={apiBase}
           {...(pendingGarment === undefined ? {} : { initialGarment: pendingGarment })}
           {...(pendingProfile === undefined ? {} : { initialProfile: pendingProfile })}
+          {...(pendingRaw === undefined ? {} : { initialRaw: pendingRaw })}
         />
       ) : (
         <p className="hint">

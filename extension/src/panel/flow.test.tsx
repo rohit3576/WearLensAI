@@ -5,31 +5,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TryOnFlow } from "./flow";
 import type { GarmentCandidate } from "../lib/detect";
 
-const { apiMocks, candidatesMock, personStoreMocks, bodyProfileMocks } = vi.hoisted(() => ({
-  apiMocks: {
-    uploadImage: vi.fn(),
-    submitTryOn: vi.fn(),
-    runTryOn: vi.fn(),
-    fetchAsBlob: vi.fn(),
-    fitAdvice: vi.fn(),
-  },
-  candidatesMock: vi.fn(),
-  personStoreMocks: {
-    loadPersonPhoto: vi.fn(),
-    savePersonPhoto: vi.fn(),
-    fileToDataUrl: vi.fn(),
-    dataUrlToFile: vi.fn(),
-    clearPersonPhoto: vi.fn(),
-  },
-  bodyProfileMocks: {
-    loadBodyProfile: vi.fn(),
-  },
-}));
+const { apiMocks, candidatesMock, personStoreMocks, bodyProfileMocks, normalizeCacheMocks } =
+  vi.hoisted(() => ({
+    apiMocks: {
+      uploadImage: vi.fn(),
+      submitTryOn: vi.fn(),
+      runTryOn: vi.fn(),
+      fetchAsBlob: vi.fn(),
+      fitAdvice: vi.fn(),
+      normalizeProfile: vi.fn(),
+    },
+    candidatesMock: vi.fn(),
+    personStoreMocks: {
+      loadPersonPhoto: vi.fn(),
+      savePersonPhoto: vi.fn(),
+      fileToDataUrl: vi.fn(),
+      dataUrlToFile: vi.fn(),
+      clearPersonPhoto: vi.fn(),
+    },
+    bodyProfileMocks: {
+      loadBodyProfile: vi.fn(),
+    },
+    normalizeCacheMocks: {
+      cachedProfile: vi.fn(),
+      cacheProfile: vi.fn(),
+    },
+  }));
 
 vi.mock("./api", () => apiMocks);
 vi.mock("./tab-candidates", () => ({ activeTabCandidates: candidatesMock }));
 vi.mock("./person-store", () => personStoreMocks);
 vi.mock("./body-profile-store", () => bodyProfileMocks);
+vi.mock("./normalize-cache", () => normalizeCacheMocks);
 
 const garment: GarmentCandidate = {
   src: "https://cdn.store.test/dress.jpg",
@@ -58,9 +65,11 @@ beforeEach(() => {
     candidatesMock,
     ...Object.values(personStoreMocks),
     ...Object.values(bodyProfileMocks),
+    ...Object.values(normalizeCacheMocks),
   ]) {
     mock.mockReset();
   }
+  normalizeCacheMocks.cachedProfile.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -308,6 +317,114 @@ describe("TryOnFlow", () => {
     );
 
     await screen.findByText(/Pick your photo once/);
+    expect(screen.queryByLabelText("Size advice")).not.toBeInTheDocument();
+  });
+
+  it("normalizes a chartless staged profile and cascades to the advice card", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    bodyProfileMocks.loadBodyProfile.mockResolvedValue({ heightCm: 172, fitPreference: "regular" });
+    const enriched = {
+      sourceUrl: "https://store.test/products/dress",
+      brand: "Acme",
+      sizeChart: {
+        unit: "cm" as const,
+        from: "llm" as const,
+        rows: [{ size: "M", heightRangeCm: [169, 176] as [number, number] }],
+      },
+    };
+    apiMocks.normalizeProfile.mockResolvedValue(enriched);
+    apiMocks.fitAdvice.mockResolvedValue({
+      size: "M",
+      confidence: "high",
+      reasons: ["Your height 172 cm is inside the M range (169–176 cm)"],
+    });
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{ sourceUrl: "https://store.test/products/dress", brand: "Acme" }}
+        initialRaw={{ tables: ["<table>Size chest S 88</table>"] }}
+      />,
+    );
+
+    expect(await screen.findByText("Size M — high confidence")).toBeInTheDocument();
+    expect(screen.getByText("Acme — size chart ✓ (1 sizes)")).toBeInTheDocument();
+    expect(apiMocks.normalizeProfile).toHaveBeenCalledTimes(1);
+    expect(apiMocks.normalizeProfile).toHaveBeenCalledWith("http://localhost:3000", {
+      sourceUrl: "https://store.test/products/dress",
+      deterministic: { sourceUrl: "https://store.test/products/dress", brand: "Acme" },
+      raw: { tables: ["<table>Size chest S 88</table>"] },
+    });
+    expect(normalizeCacheMocks.cacheProfile).toHaveBeenCalledWith(enriched);
+  });
+
+  it("skips the normalize call when the cache already holds a profile for the URL", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    bodyProfileMocks.loadBodyProfile.mockResolvedValue(undefined);
+    normalizeCacheMocks.cachedProfile.mockResolvedValue({
+      sourceUrl: "https://store.test/products/dress",
+      brand: "Acme",
+      sizeChart: {
+        unit: "cm",
+        from: "llm",
+        rows: [{ size: "M", heightRangeCm: [169, 176] }],
+      },
+    });
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{ sourceUrl: "https://store.test/products/dress", brand: "Acme" }}
+        initialRaw={{ tables: ["<table>Size chest</table>"] }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Acme — size chart ✓ (1 sizes)")).toBeInTheDocument();
+    });
+    expect(apiMocks.normalizeProfile).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("Set your height in Your fit above for size advice."),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the honest no-chart line when normalization finds nothing (rules mode)", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    apiMocks.normalizeProfile.mockResolvedValue(undefined);
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{ sourceUrl: "https://store.test/products/dress", brand: "Acme" }}
+        initialRaw={{ tables: ["<table>no sizes here</table>"] }}
+      />,
+    );
+
+    await screen.findByText("Acme — no size chart on this page");
+    expect(screen.queryByLabelText("Size advice")).not.toBeInTheDocument();
+  });
+
+  it("stays silent when normalization itself fails — the deterministic view remains", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    apiMocks.normalizeProfile.mockRejectedValue(new Error("backend down"));
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{ sourceUrl: "https://store.test/products/dress", brand: "Acme" }}
+        initialRaw={{ tables: ["<table>Size chest</table>"] }}
+      />,
+    );
+
+    await screen.findByText("Acme — no size chart on this page");
     expect(screen.queryByLabelText("Size advice")).not.toBeInTheDocument();
   });
 });
