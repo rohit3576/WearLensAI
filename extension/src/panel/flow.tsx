@@ -12,6 +12,7 @@ import { CropStep } from "./crop-step";
 import { dataUrlToFile, fileToDataUrl, loadPersonPhoto, savePersonPhoto } from "./person-store";
 import { activeTabCandidates } from "./tab-candidates";
 import type { GarmentCandidate } from "../lib/detect";
+import type { GarmentProfile } from "../lib/profile/schema";
 import type { StatusEvent } from "./status-events";
 
 type Stage =
@@ -26,9 +27,11 @@ export interface TryOnFlowProps {
   readonly apiBase: string;
   /** Pre-selected garment (badge click) — skips scanning straight to setup. */
   readonly initialGarment?: string;
+  /** What the badge click read from the page (brand · category · chart state). */
+  readonly initialProfile?: GarmentProfile;
 }
 
-export function TryOnFlow({ apiBase, initialGarment }: TryOnFlowProps) {
+export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlowProps) {
   const [stage, setStage] = useState<Stage>({ kind: "scanning" });
 
   const scan = useCallback(async () => {
@@ -95,6 +98,8 @@ export function TryOnFlow({ apiBase, initialGarment }: TryOnFlowProps) {
 
   return (
     <section className="flow" aria-label="Try-on flow">
+      {initialProfile !== undefined ? <ProfileLine profile={initialProfile} /> : null}
+
       {stage.kind === "scanning" ? <p className="hint">Looking for garments on this page…</p> : null}
 
       {stage.kind === "pick" ? (
@@ -190,6 +195,22 @@ export function TryOnFlow({ apiBase, initialGarment }: TryOnFlowProps) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ProfileLine({ profile }: { profile: GarmentProfile }) {
+  const identity = [profile.brand, profile.category]
+    .filter((part): part is string => part !== undefined)
+    .join(" · ");
+  const chart =
+    profile.sizeChart !== undefined
+      ? `size chart ✓ (${profile.sizeChart.rows.length} sizes)`
+      : "no size chart on this page";
+  return (
+    <p className="hint profile-line">
+      {identity !== "" ? `${identity} — ` : ""}
+      {chart}
+    </p>
   );
 }
 

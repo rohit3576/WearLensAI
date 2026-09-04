@@ -92,4 +92,35 @@ describe("Panel shell", () => {
       expect(getMock).toHaveBeenLastCalledWith("http://localhost:9999/api/health");
     });
   });
+
+  it("passes a staged badge-click profile to the flow; corrupt staging stays hidden", async () => {
+    getMock.mockReturnValue(kyResponse({ ok: true, engine: "stub", storage: "local" }));
+    const sessionStored: Record<string, unknown> = {
+      pendingGarment: "https://cdn.store.test/picked.jpg",
+      pendingProfile: { nonsense: true },
+    };
+    vi.stubGlobal("chrome", {
+      storage: {
+        local: {
+          get: async () => ({}),
+          set: setMock,
+        },
+        session: {
+          get: async (keys: string[]) =>
+            Object.fromEntries(keys.filter((k) => k in sessionStored).map((k) => [k, sessionStored[k]])),
+          set: async (items: Record<string, unknown>) => {
+            Object.assign(sessionStored, items);
+          },
+        },
+      },
+    });
+
+    render(<Panel />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pick your photo once/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/no size chart on this page/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/size chart ✓/)).not.toBeInTheDocument();
+  });
 });

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import ky from "ky";
 import { z } from "zod";
 import { TryOnFlow } from "./flow";
+import { takePendingProfile } from "./profile-store";
+import type { GarmentProfile } from "../lib/profile/schema";
 import "./panel.css";
 
 export const DEFAULT_API_BASE = "http://localhost:3000" as const;
@@ -64,6 +66,7 @@ export function Panel() {
   const [health, setHealth] = useState<HealthState>({ state: "checking" });
   const [saving, setSaving] = useState(false);
   const [pendingGarment, setPendingGarment] = useState<string | undefined>(undefined);
+  const [pendingProfile, setPendingProfile] = useState<GarmentProfile | undefined>(undefined);
 
   useEffect(() => {
     void (async () => {
@@ -74,6 +77,7 @@ export function Panel() {
         await session?.set({ pendingGarment: "" });
         setPendingGarment(staged);
       }
+      setPendingProfile(await takePendingProfile());
       const saved = await readSavedApiBase();
       setApiBase(saved);
       setHealth(await checkHealth(saved));
@@ -119,7 +123,11 @@ export function Panel() {
         </div>
       </section>
       {health.state === "ok" ? (
-        <TryOnFlow apiBase={apiBase} {...(pendingGarment === undefined ? {} : { initialGarment: pendingGarment })} />
+        <TryOnFlow
+          apiBase={apiBase}
+          {...(pendingGarment === undefined ? {} : { initialGarment: pendingGarment })}
+          {...(pendingProfile === undefined ? {} : { initialProfile: pendingProfile })}
+        />
       ) : (
         <p className="hint">
           Set the backend URL above and save — the try-on flow starts once the

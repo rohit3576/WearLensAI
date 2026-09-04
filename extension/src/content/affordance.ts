@@ -1,7 +1,9 @@
 import { detectGarmentCandidates } from "../lib/detect";
+import { buildGarmentProfile } from "../lib/profile/extract";
+import type { GarmentProfile } from "../lib/profile/schema";
 
 const BADGE_CLASS = "wearlens-try-badge" as const;
-const TRY_MESSAGE = "wearlens:try-this" as const;
+const PICK_MESSAGE = "wearlens:garment-picked" as const;
 const REBIND_DEBOUNCE_MS = 400;
 
 export interface AffordanceHooks {
@@ -57,7 +59,11 @@ export function startAffordance(
 
   badge.addEventListener("click", () => {
     if (activeImage !== null) {
-      hooks.sendMessage({ type: TRY_MESSAGE, src: activeImage.src });
+      hooks.sendMessage({
+        type: PICK_MESSAGE,
+        src: activeImage.src,
+        profile: buildGarmentProfile(doc, doc.location?.href ?? doc.baseURI),
+      });
     }
     badge.hidden = true;
   });

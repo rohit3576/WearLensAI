@@ -141,4 +141,61 @@ describe("TryOnFlow", () => {
     });
     expect(candidatesMock).not.toHaveBeenCalled();
   });
+
+  it("shows the profile line with chart status when the badge click carried a profile", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{
+          sourceUrl: "https://store.test/products/dress",
+          brand: "Acme",
+          category: "Dresses",
+          sizeChart: {
+            unit: "cm",
+            from: "dom-table",
+            rows: [
+              { size: "S", chestCm: 88 },
+              { size: "M", chestCm: 94 },
+            ],
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Acme · Dresses — size chart ✓ (2 sizes)")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the honest no-chart line when the profile carries no chart", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{ sourceUrl: "https://store.test/products/dress", brand: "Acme" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Acme — no size chart on this page")).toBeInTheDocument();
+    });
+  });
+
+  it("renders no profile line when no profile was staged", async () => {
+    candidatesMock.mockResolvedValue([garment]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+
+    render(<TryOnFlow apiBase="http://localhost:3000" />);
+
+    await screen.findByRole("button", { name: "Detected garment" });
+    expect(screen.queryByText(/no size chart on this page/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/size chart ✓/)).not.toBeInTheDocument();
+  });
 });

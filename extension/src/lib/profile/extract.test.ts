@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { extractGarmentProfile } from "./extract";
+import { extractGarmentProfile, buildGarmentProfile } from "./extract";
 
 const STORE_URL = "https://store.test/products/wrap-dress";
 
@@ -110,5 +110,47 @@ describe("extractGarmentProfile", () => {
     const profile = extractGarmentProfile(doc, STORE_URL);
 
     expect(profile?.title).toBe("Second Product");
+  });
+});
+
+describe("buildGarmentProfile", () => {
+  const chartTable = `
+    <table><tbody>
+      <tr><th>Size</th><th>Chest (cm)</th></tr>
+      <tr><td>S</td><td>88</td></tr>
+      <tr><td>M</td><td>94</td></tr>
+    </tbody></table>
+  `;
+
+  it("merges JSON-LD fields with the DOM size chart", () => {
+    const doc = page(
+      jsonLdScript({ "@type": "Product", name: "Wrap Dress", brand: "Acme" }) + chartTable,
+    );
+
+    const profile = buildGarmentProfile(doc, STORE_URL);
+
+    expect(profile?.title).toBe("Wrap Dress");
+    expect(profile?.brand).toBe("Acme");
+    expect(profile?.sizeChart?.rows).toHaveLength(2);
+  });
+
+  it("yields a chart-only profile when the page has no ld+json fields", () => {
+    const doc = page(chartTable);
+
+    const profile = buildGarmentProfile(doc, STORE_URL);
+
+    expect(profile).toEqual({
+      sourceUrl: STORE_URL,
+      sizeChart: { unit: "cm", from: "dom-table", rows: [
+        { size: "S", chestCm: 88 },
+        { size: "M", chestCm: 94 },
+      ] },
+    });
+  });
+
+  it("returns undefined when the page offers neither fields nor chart", () => {
+    const doc = page('<div class="product">No structured data</div>');
+
+    expect(buildGarmentProfile(doc, STORE_URL)).toBeUndefined();
   });
 });

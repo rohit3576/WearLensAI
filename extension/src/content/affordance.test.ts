@@ -16,7 +16,7 @@ function storePage(extraBody = ""): Document {
   return dom.window.document;
 }
 
-let sendMessageMock: ReturnType<typeof vi.fn<() => void>>;
+let sendMessageMock: ReturnType<typeof vi.fn<(message: unknown) => void>>;
 let doc: Document;
 let stop: (() => void) | undefined;
 
@@ -48,8 +48,9 @@ describe("startAffordance", () => {
     badge.click();
 
     expect(sendMessageMock).toHaveBeenCalledWith({
-      type: "wearlens:try-this",
+      type: "wearlens:garment-picked",
       src: "https://cdn.store.test/model-worn.jpg",
+      profile: undefined,
     });
     expect(badge.hidden).toBe(true);
   });
@@ -88,9 +89,49 @@ describe("startAffordance", () => {
 
     badge.click();
     expect(sendMessageMock).toHaveBeenCalledWith({
-      type: "wearlens:try-this",
+      type: "wearlens:garment-picked",
       src: "https://cdn.store.test/second-dress.jpg",
+      profile: undefined,
     });
+  });
+
+  it("carries the garment profile (ld+json fields + size chart) on click", () => {
+    const dom = new JSDOM(
+      `<!DOCTYPE html><html><head>
+        <script type="application/ld+json">
+          {"@type": "Product", "name": "Wrap Dress", "brand": "Acme"}
+        </script>
+      </head><body>
+        <img src="https://cdn.store.test/model-worn.jpg" width="640" height="853" alt="Wrap dress worn by model">
+        <table><tbody>
+          <tr><th>Size</th><th>Chest (cm)</th></tr>
+          <tr><td>S</td><td>88</td></tr>
+          <tr><td>M</td><td>94</td></tr>
+        </tbody></table>
+      </body></html>`,
+      { url: STORE_URL },
+    );
+    doc = dom.window.document;
+
+    stop = startAffordance(doc, { sendMessage: sendMessageMock }, false);
+
+    const img = doc.querySelector("img");
+    if (img === null) throw new Error("fixture image missing");
+    img.dispatchEvent(new doc.defaultView!.Event("mouseenter", { bubbles: false }));
+    const badge = doc.querySelector("button.wearlens-try-badge") as HTMLButtonElement | null;
+    if (badge === null) throw new Error("badge missing");
+    badge.click();
+
+    expect(sendMessageMock).toHaveBeenCalledTimes(1);
+    const message = sendMessageMock.mock.calls[0]?.[0] as {
+      type: string;
+      src: string;
+      profile: { title?: string; brand?: string; sizeChart?: { rows: unknown[] } };
+    };
+    expect(message.type).toBe("wearlens:garment-picked");
+    expect(message.profile.title).toBe("Wrap Dress");
+    expect(message.profile.brand).toBe("Acme");
+    expect(message.profile.sizeChart?.rows).toHaveLength(2);
   });
 
   it("hides the badge on page scroll", () => {

@@ -8,6 +8,7 @@
  */
 import { isProductNode, visitJsonLdNodes } from "../jsonld-walk";
 import type { JsonLdNode } from "../jsonld-walk";
+import { extractSizeChart } from "./size-chart";
 import { GarmentProfileSchema } from "./schema";
 import type { GarmentProfile } from "./schema";
 
@@ -35,4 +36,20 @@ export function extractGarmentProfile(doc: Document, sourceUrl: string): Garment
     return GarmentProfileSchema.parse(candidate);
   }
   return undefined;
+}
+
+/**
+ * The badge-click entry point: everything this page says about the
+ * garment — JSON-LD fields plus the DOM size chart when present. A
+ * chart alone still yields a profile (the fit engine runs on charts);
+ * a page with neither returns undefined.
+ */
+export function buildGarmentProfile(doc: Document, sourceUrl: string): GarmentProfile | undefined {
+  const fields = extractGarmentProfile(doc, sourceUrl);
+  const sizeChart = extractSizeChart(doc);
+  if (fields === undefined && sizeChart === undefined) return undefined;
+  return GarmentProfileSchema.parse({
+    ...(fields ?? { sourceUrl }),
+    sizeChart,
+  });
 }
