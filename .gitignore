@@ -36,3 +36,6 @@ build/
 
 # --- macOS ---
 .DS_Store
+
+# --- Extension build/dev artifacts ---
+extension/node_modules/

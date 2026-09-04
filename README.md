@@ -56,7 +56,11 @@ wearing **that** garment, side by side with the original. No coin flip.
 | **A seller or indie brand** | A try-on experience you can host yourself, on free tiers — no per-image SaaS tax, and your product images stay in your stack |
 | **A developer** | An MIT-licensed, seam-first codebase where every external service has an offline twin — fork it, test it for $0, flip env vars to go live |
 | **An AI agent builder** | A ready-made MCP server: your agent can drive the entire try-on pipeline (submit, poll, fetch results) as three tool calls — [docs/mcp.md](docs/mcp.md) |
+<<<<<<< HEAD
 | **A shopper on any store** | The browser extension (building): it spots the garment on a product page and shows it on your photo — no store integration needed |
+=======
+| **A shopper on any store** | The browser extension: it spots the garment on a product page and shows it on your photo — [docs/extension.md](docs/extension.md) |
+>>>>>>> feature/web-ext
 
 ## Why this one is different
 
@@ -107,6 +111,12 @@ ai/ ────── benchmark + batch inference (fal adapters, dry-run gatewa
 cd web && pnpm install && pnpm build && pnpm start
 ```
 
+<<<<<<< HEAD
+=======
+**Deploy** (Vercel + Neon + R2, all free tiers, ~10 minutes):
+see [docs/deploy.md](docs/deploy.md).
+
+>>>>>>> feature/web-ext
 **MCP server** (for Claude Desktop / opencode — wiring guide in
 [docs/mcp.md](docs/mcp.md)):
 
@@ -139,17 +149,34 @@ uv run pytest                          # 45 Python tests
 
 Runs on free tiers end-to-end — the hosted demo costs $0/month.
 
+<<<<<<< HEAD
 ## The browser extension (building now)
+=======
+## The browser extension
+>>>>>>> feature/web-ext
 
 The zero-integration path for shoppers — and the fastest way for a store to
 offer try-on without touching their codebase. The extension detects the
 garment image on any fashion product page (JSON-LD → og:image → gallery
+<<<<<<< HEAD
 heuristics), the shopper picks their photo once, and the before/after
 result renders in the side panel. Store owners and devs can point it at
 their own WearLensAI deployment — the same API this repo ships.
 
 ## Not in scope (yet)
 
+=======
+heuristics), shows a **Try this on** badge, and renders the before/after
+result in its side panel. Your photo is saved once, locally, and reused on
+every store. Store owners and devs can point it at their own WearLensAI
+deployment — the same API this repo ships.
+
+Full install guide, detection limits, and the store-owner path:
+[docs/extension.md](docs/extension.md)
+
+## Not in scope (yet)
+
+>>>>>>> feature/web-ext
 Amazon/Flipkart deep integration, body measurements, size prediction, AI
 shopping agent, recommendations, mobile app, training custom models. One
 thing at a time.

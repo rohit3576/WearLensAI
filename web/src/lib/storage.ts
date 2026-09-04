@@ -12,12 +12,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { isStoredName, readImageFrom } from "./file-serving";
+import { r2StorageFromEnv } from "./r2-storage";
 import type { UploadRole } from "./upload-rules";
 
 export interface StoredUpload {
   readonly bytes: Buffer;
   readonly contentType: "image/jpeg" | "image/png" | "image/webp";
-  readonly role: UploadRole;
+  /** Upload-boundary metadata (dropzone hints); engine results omit it. */
+  readonly role?: UploadRole;
 }
 
 export interface Storage {
@@ -73,19 +75,10 @@ export class LocalStorage implements Storage {
 
 const StorageNameSchema = z.enum(["local", "r2"]).default("local");
 
-export class StorageNotImplementedError extends Error {
-  readonly name = "StorageNotImplementedError";
-  constructor(readonly storageName: string) {
-    super(
-      `storage "${storageName}" is not implemented yet ` +
-        "(see src/lib/r2-storage.ts for the deferred plan)",
-    );
-  }
-}
-
 /**
  * Resolve storage from the environment. A typo in TRYON_STORAGE fails
- * loudly (ZodError) instead of silently downgrading.
+ * loudly (ZodError) instead of silently downgrading; r2 additionally
+ * requires the R2_* vars (see r2StorageFromEnv).
  */
 export function resolveStorage(
   env: Readonly<Record<string, string | undefined>>,
@@ -96,7 +89,7 @@ export function resolveStorage(
     case "local":
       return new LocalStorage(config);
     case "r2":
-      throw new StorageNotImplementedError(name);
+      return r2StorageFromEnv(env);
     default: {
       const exhausted: never = name;
       throw new Error(`unexpected storage name: ${String(exhausted)}`);

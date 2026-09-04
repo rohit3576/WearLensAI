@@ -1,4 +1,6 @@
-import { mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +17,8 @@ const PROCESSING_DELAY_MS = 200;
 
 let inputDir: string;
 let outputDir: string;
+let personPath: string;
+let garmentPath: string;
 let input: SubmitTryOn;
 
 function makeConfig(overrides: Partial<StubEngineConfig> = {}): StubEngineConfig {
@@ -51,8 +55,8 @@ async function settleToTerminal(engine: StubEngine, jobId: JobId): Promise<JobSt
 beforeAll(async () => {
   inputDir = await mkdtemp(path.join(tmpdir(), "tryon-input-"));
   outputDir = await mkdtemp(path.join(tmpdir(), "tryon-output-"));
-  const personPath = path.join(inputDir, "person.png");
-  const garmentPath = path.join(inputDir, "garment.png");
+  personPath = path.join(inputDir, "person.png");
+  garmentPath = path.join(inputDir, "garment.png");
   await sharp({
     create: { width: PERSON_WIDTH, height: PERSON_HEIGHT, channels: 3, background: "#7890a0" },
   })
@@ -261,5 +265,134 @@ describe("StubEngine", () => {
 
     expect(status.phase).toBe("done");
     expect(resolvedPerson).toBe("/api/files/abc.png");
+  });
+});
+
+describe("StubEngine deploy wiring", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function pollToTerminal(engine: StubEngine, jobId: JobId): Promise<JobStatus> {
+    for (let tick = 0; tick < 500; tick++) {
+      const status = await engine.status(jobId);
+      if (status.phase === "done" || status.phase === "failed") return status;
+      await realSleep(10);
+    }
+    throw new Error("engine did not reach a terminal phase");
+  }
+
+  async function startFixtureServer(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+    const server = createServer((request, response) => {
+      if (request.url === "/person.png" || request.url === "/garment.png") {
+        void readFile(request.url === "/person.png" ? personPath : garmentPath)
+          .then((bytes) => {
+            response.setHeader("Content-Type", "image/png");
+            response.end(bytes);
+          })
+          .catch(() => {
+            response.statusCode = 500;
+            response.end();
+          });
+        return;
+      }
+      response.statusCode = 404;
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    return {
+      baseUrl: `http://127.0.0.1:${port}`,
+      close: () =>
+        new Promise<void>((resolve, reject) =>
+          server.close((error) => (error === undefined ? resolve() : reject(error))),
+        ),
+    };
+  }
+
+  it("fetches http(s) input URLs and composites from the downloaded bytes", async () => {
+    const server = await startFixtureServer();
+    try {
+      const engine = new StubEngine(makeConfig({ queuedDelayMs: 5, processingDelayMs: 5 }));
+
+      const jobId = await engine.submit({
+        personUrl: `${server.baseUrl}/person.png`,
+        garmentUrl: `${server.baseUrl}/garment.png`,
+      });
+      const status = await pollToTerminal(engine, jobId);
+
+      expect(status.phase).toBe("done");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("fails the job with the HTTP status when an input URL is not OK", async () => {
+    const server = await startFixtureServer();
+    try {
+      const engine = new StubEngine(makeConfig({ queuedDelayMs: 5, processingDelayMs: 5 }));
+
+      const jobId = await engine.submit({
+        personUrl: `${server.baseUrl}/missing.png`,
+        garmentUrl: `${server.baseUrl}/garment.png`,
+      });
+      const status = await pollToTerminal(engine, jobId);
+
+      expect(status.phase).toBe("failed");
+      if (status.phase !== "failed") throw new Error("unreachable");
+      expect(status.reason).toContain("404");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("hands the composite PNG to storeResult and reports its URL, writing nothing to disk", async () => {
+    const stored: Buffer[] = [];
+    const engine = new StubEngine(
+      makeConfig({
+        queuedDelayMs: 5,
+        processingDelayMs: 5,
+        storeResult: async (png) => {
+          stored.push(png);
+          return "https://pub-x.r2.dev/uploads/r.png";
+        },
+      }),
+    );
+
+    const jobId = await engine.submit(input);
+    const status = await pollToTerminal(engine, jobId);
+
+    expect(status.phase).toBe("done");
+    if (status.phase !== "done") throw new Error("unreachable");
+    expect(status.resultUrl).toBe("https://pub-x.r2.dev/uploads/r.png");
+    expect(stored).toHaveLength(1);
+    const png = stored[0];
+    if (png === undefined) throw new Error("no composite captured");
+    const meta = await sharp(png).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.width).toBe(PERSON_WIDTH);
+    expect(meta.height).toBe(PERSON_HEIGHT);
+    await expect(access(path.join(outputDir, `${jobId}.png`))).rejects.toThrow();
+  });
+
+  it("routes the lifecycle through the background scheduler when provided", async () => {
+    const tasks: Promise<void>[] = [];
+    const engine = new StubEngine(
+      makeConfig({
+        queuedDelayMs: 5,
+        processingDelayMs: 5,
+        background: (task) => {
+          tasks.push(task);
+        },
+      }),
+    );
+
+    const jobId = await engine.submit(input);
+    expect(tasks).toHaveLength(1);
+
+    await tasks[0];
+    const status = await engine.status(jobId);
+
+    expect(status.phase).toBe("done");
   });
 });
