@@ -56,11 +56,7 @@ wearing **that** garment, side by side with the original. No coin flip.
 | **A seller or indie brand** | A try-on experience you can host yourself, on free tiers — no per-image SaaS tax, and your product images stay in your stack |
 | **A developer** | An MIT-licensed, seam-first codebase where every external service has an offline twin — fork it, test it for $0, flip env vars to go live |
 | **An AI agent builder** | A ready-made MCP server: your agent can drive the entire try-on pipeline (submit, poll, fetch results) as three tool calls — [docs/mcp.md](docs/mcp.md) |
-<<<<<<< HEAD
-| **A shopper on any store** | The browser extension (building): it spots the garment on a product page and shows it on your photo — no store integration needed |
-=======
-| **A shopper on any store** | The browser extension: it spots the garment on a product page and shows it on your photo — [docs/extension.md](docs/extension.md) |
->>>>>>> feature/web-ext
+| **A shopper on any store** | The browser extension: it spots the garment on a product page, shows it on your photo, and recommends your size from the store's own chart — [docs/extension.md](docs/extension.md) |
 
 ## Why this one is different
 
@@ -87,6 +83,9 @@ path on every commit.
 - **Preflight quality layer** — deterministic image checks (aspect window,
   blank-frame variance, skin-tone presence, transparency) with actionable
   error copy.
+- **Fit engine** — deterministic size advice from the store's own size
+  chart: height/chest/waist arithmetic with confidence and
+  plain-English reasons, no invented constants — `POST /api/fit`.
 - **MCP server for AI agents** — three stdio tools over the exact same
   engine seams as the web app; agents can run the full 200-image
   evaluation pipeline unattended.
@@ -98,6 +97,7 @@ path on every commit.
 ```text
 web app ─┬─ POST /api/upload ── window validation → preflight → Storage (local │ R2)
          ├─ POST /api/try-on ─ TryOnEngine (stub │ fal) → JobStore (sqlite │ Neon)
+         ├─ POST /api/fit ──── size-chart arithmetic → size + confidence + reasons
          └─ GET /status (SSE) → done → /api/results/<id>.png
 MCP ────── same runtime seams → submit / status / result tools
 ai/ ────── benchmark + batch inference (fal adapters, dry-run gateway)
@@ -111,12 +111,9 @@ ai/ ────── benchmark + batch inference (fal adapters, dry-run gatewa
 cd web && pnpm install && pnpm build && pnpm start
 ```
 
-<<<<<<< HEAD
-=======
 **Deploy** (Vercel + Neon + R2, all free tiers, ~10 minutes):
 see [docs/deploy.md](docs/deploy.md).
 
->>>>>>> feature/web-ext
 **MCP server** (for Claude Desktop / opencode — wiring guide in
 [docs/mcp.md](docs/mcp.md)):
 
@@ -133,7 +130,8 @@ uv sync && uv run python -m ai.inference --help
 **Tests** — the whole thing is proven offline, every commit:
 
 ```bash
-cd web && pnpm test && pnpm test:e2e   # 122 unit + Playwright E2E in real Chrome
+cd web && pnpm test && pnpm test:e2e   # 166 unit + Playwright E2E in real Chrome
+cd extension && pnpm test              # 85 extension tests
 uv run pytest                          # 45 Python tests
 ```
 
@@ -149,37 +147,26 @@ uv run pytest                          # 45 Python tests
 
 Runs on free tiers end-to-end — the hosted demo costs $0/month.
 
-<<<<<<< HEAD
-## The browser extension (building now)
-=======
 ## The browser extension
->>>>>>> feature/web-ext
 
 The zero-integration path for shoppers — and the fastest way for a store to
 offer try-on without touching their codebase. The extension detects the
 garment image on any fashion product page (JSON-LD → og:image → gallery
-<<<<<<< HEAD
-heuristics), the shopper picks their photo once, and the before/after
-result renders in the side panel. Store owners and devs can point it at
-their own WearLensAI deployment — the same API this repo ships.
-
-## Not in scope (yet)
-
-=======
 heuristics), shows a **Try this on** badge, and renders the before/after
-result in its side panel. Your photo is saved once, locally, and reused on
-every store. Store owners and devs can point it at their own WearLensAI
-deployment — the same API this repo ships.
+result in its side panel. It also reads the store's size chart, and with
+your height saved once it recommends a size with the reasoning shown.
+Your photo is saved once, locally, and reused on every store. Store owners
+and devs can point it at their own WearLensAI deployment — the same API
+this repo ships.
 
-Full install guide, detection limits, and the store-owner path:
-[docs/extension.md](docs/extension.md)
+Full install guide, size-advice details, detection limits, and the
+store-owner path: [docs/extension.md](docs/extension.md)
 
 ## Not in scope (yet)
 
->>>>>>> feature/web-ext
-Amazon/Flipkart deep integration, body measurements, size prediction, AI
-shopping agent, recommendations, mobile app, training custom models. One
-thing at a time.
+Amazon/Flipkart deep integration, body measurements, ML fit prediction,
+AI shopping agent, recommendations, mobile app, training custom models.
+One thing at a time.
 
 ## License
 
