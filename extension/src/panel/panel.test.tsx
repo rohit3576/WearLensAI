@@ -93,8 +93,17 @@ describe("Panel shell", () => {
     });
   });
 
-  it("passes a staged badge-click profile to the flow; corrupt staging stays hidden", async () => {
+  it("shows the Your-fit section between backend settings and the flow", async () => {
     getMock.mockReturnValue(kyResponse({ ok: true, engine: "stub", storage: "local" }));
+
+    render(<Panel />);
+
+    const fit = await screen.findByRole("region", { name: "Your fit" });
+    const settings = screen.getByRole("region", { name: "Backend settings" });
+    expect(fit.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
+  it("passes a staged badge-click profile to the flow; corrupt staging stays hidden", async () => {    getMock.mockReturnValue(kyResponse({ ok: true, engine: "stub", storage: "local" }));
     const sessionStored: Record<string, unknown> = {
       pendingGarment: "https://cdn.store.test/picked.jpg",
       pendingProfile: { nonsense: true },

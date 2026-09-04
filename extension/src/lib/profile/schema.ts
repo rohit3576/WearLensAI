@@ -27,6 +27,33 @@ export const GarmentProfileSchema = z.object({
   sizeChart: SizeChartSchema.optional(),
 });
 
+/**
+ * Body profile — entered by the shopper, never predicted. Canonical cm
+ * integers; the imperial UI converts before save. Twin of the /api/fit
+ * request side (web/src/lib/fit, F3).
+ */
+export const BodyProfileSchema = z.object({
+  heightCm: z
+    .number()
+    .int()
+    .min(120, "Height must be between 120 and 220 cm")
+    .max(220, "Height must be between 120 and 220 cm"),
+  chestCm: z
+    .number()
+    .int()
+    .min(60, "Chest must be between 60 and 160 cm")
+    .max(160, "Chest must be between 60 and 160 cm")
+    .optional(),
+  waistCm: z
+    .number()
+    .int()
+    .min(60, "Waist must be between 60 and 160 cm")
+    .max(160, "Waist must be between 60 and 160 cm")
+    .optional(),
+  fitPreference: z.enum(["tight", "regular", "loose"]).default("regular"),
+});
+
 export type SizeRow = z.infer<typeof SizeRowSchema>;
 export type SizeChart = z.infer<typeof SizeChartSchema>;
 export type GarmentProfile = z.infer<typeof GarmentProfileSchema>;
+export type BodyProfile = z.infer<typeof BodyProfileSchema>;

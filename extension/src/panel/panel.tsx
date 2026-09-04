@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ky from "ky";
 import { z } from "zod";
+import { BodyProfileSection } from "./body-profile";
 import { TryOnFlow } from "./flow";
 import { takePendingProfile } from "./profile-store";
 import type { GarmentProfile } from "../lib/profile/schema";
@@ -122,6 +123,7 @@ export function Panel() {
           </button>
         </div>
       </section>
+      <BodyProfileSection />
       {health.state === "ok" ? (
         <TryOnFlow
           apiBase={apiBase}
