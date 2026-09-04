@@ -278,3 +278,29 @@ body {
   font-size: 12px;
   color: var(--foreground);
 }
+
+.fit-advice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+}
+
+.fit-advice-headline {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.fit-advice-reasons {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}

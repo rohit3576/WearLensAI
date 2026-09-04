@@ -5,12 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TryOnFlow } from "./flow";
 import type { GarmentCandidate } from "../lib/detect";
 
-const { apiMocks, candidatesMock, personStoreMocks } = vi.hoisted(() => ({
+const { apiMocks, candidatesMock, personStoreMocks, bodyProfileMocks } = vi.hoisted(() => ({
   apiMocks: {
     uploadImage: vi.fn(),
     submitTryOn: vi.fn(),
     runTryOn: vi.fn(),
     fetchAsBlob: vi.fn(),
+    fitAdvice: vi.fn(),
   },
   candidatesMock: vi.fn(),
   personStoreMocks: {
@@ -20,11 +21,15 @@ const { apiMocks, candidatesMock, personStoreMocks } = vi.hoisted(() => ({
     dataUrlToFile: vi.fn(),
     clearPersonPhoto: vi.fn(),
   },
+  bodyProfileMocks: {
+    loadBodyProfile: vi.fn(),
+  },
 }));
 
 vi.mock("./api", () => apiMocks);
 vi.mock("./tab-candidates", () => ({ activeTabCandidates: candidatesMock }));
 vi.mock("./person-store", () => personStoreMocks);
+vi.mock("./body-profile-store", () => bodyProfileMocks);
 
 const garment: GarmentCandidate = {
   src: "https://cdn.store.test/dress.jpg",
@@ -34,11 +39,25 @@ const garment: GarmentCandidate = {
   source: "jsonld",
 };
 
+const chartedProfile = {
+  sourceUrl: "https://store.test/products/dress",
+  brand: "Acme",
+  sizeChart: {
+    unit: "cm" as const,
+    from: "dom-table" as const,
+    rows: [
+      { size: "S", heightRangeCm: [160, 168] as [number, number] },
+      { size: "M", heightRangeCm: [169, 176] as [number, number] },
+    ],
+  },
+};
+
 beforeEach(() => {
   for (const mock of [
     ...Object.values(apiMocks),
     candidatesMock,
     ...Object.values(personStoreMocks),
+    ...Object.values(bodyProfileMocks),
   ]) {
     mock.mockReset();
   }
@@ -197,5 +216,98 @@ describe("TryOnFlow", () => {
     await screen.findByRole("button", { name: "Detected garment" });
     expect(screen.queryByText(/no size chart on this page/)).not.toBeInTheDocument();
     expect(screen.queryByText(/size chart ✓/)).not.toBeInTheDocument();
+  });
+
+  it("renders the size-advice card when a chart and a saved body profile exist", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    bodyProfileMocks.loadBodyProfile.mockResolvedValue({
+      heightCm: 172,
+      fitPreference: "regular",
+    });
+    apiMocks.fitAdvice.mockResolvedValue({
+      size: "M",
+      confidence: "high",
+      reasons: ["Your height 172 cm is inside the M range (169–176 cm)"],
+    });
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={chartedProfile}
+      />,
+    );
+
+    expect(
+      await screen.findByText("Size M — high confidence"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Your height 172 cm is inside the M range (169–176 cm)"),
+    ).toBeInTheDocument();
+    expect(apiMocks.fitAdvice).toHaveBeenCalledTimes(1);
+    expect(apiMocks.fitAdvice).toHaveBeenCalledWith(
+      "http://localhost:3000",
+      chartedProfile,
+      { heightCm: 172, fitPreference: "regular" },
+    );
+  });
+
+  it("shows the set-height prompt when no body profile is saved", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    bodyProfileMocks.loadBodyProfile.mockResolvedValue(undefined);
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={chartedProfile}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Set your height in Your fit above for size advice."),
+      ).toBeInTheDocument();
+    });
+    expect(apiMocks.fitAdvice).not.toHaveBeenCalled();
+  });
+
+  it("never requests advice when the profile has no chart", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    bodyProfileMocks.loadBodyProfile.mockResolvedValue({ heightCm: 172, fitPreference: "regular" });
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={{ sourceUrl: "https://store.test/products/dress", brand: "Acme" }}
+      />,
+    );
+
+    await screen.findByText(/Pick your photo once/);
+    expect(apiMocks.fitAdvice).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Size advice")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Set your height/)).not.toBeInTheDocument();
+  });
+
+  it("stays silent when the advice fetch fails — try-on is unaffected", async () => {
+    candidatesMock.mockResolvedValue([]);
+    personStoreMocks.loadPersonPhoto.mockResolvedValue(undefined);
+    bodyProfileMocks.loadBodyProfile.mockResolvedValue({ heightCm: 172, fitPreference: "regular" });
+    apiMocks.fitAdvice.mockRejectedValue(new Error("backend down"));
+
+    render(
+      <TryOnFlow
+        apiBase="http://localhost:3000"
+        initialGarment="https://cdn.store.test/picked.jpg"
+        initialProfile={chartedProfile}
+      />,
+    );
+
+    await screen.findByText(/Pick your photo once/);
+    expect(screen.queryByLabelText("Size advice")).not.toBeInTheDocument();
   });
 });

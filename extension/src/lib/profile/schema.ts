@@ -53,7 +53,14 @@ export const BodyProfileSchema = z.object({
   fitPreference: z.enum(["tight", "regular", "loose"]).default("regular"),
 });
 
+export const FitAdviceSchema = z.object({
+  size: z.string().min(1).optional(),
+  confidence: z.enum(["high", "medium", "low", "none"]),
+  reasons: z.array(z.string().min(1)),
+});
+
 export type SizeRow = z.infer<typeof SizeRowSchema>;
 export type SizeChart = z.infer<typeof SizeChartSchema>;
 export type GarmentProfile = z.infer<typeof GarmentProfileSchema>;
 export type BodyProfile = z.infer<typeof BodyProfileSchema>;
+export type FitAdvice = z.infer<typeof FitAdviceSchema>;

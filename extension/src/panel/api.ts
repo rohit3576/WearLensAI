@@ -5,6 +5,8 @@
  */
 import ky, { HTTPError } from "ky";
 import { z } from "zod";
+import type { BodyProfile, FitAdvice, GarmentProfile } from "../lib/profile/schema";
+import { FitAdviceSchema } from "../lib/profile/schema";
 import type { StatusEvent } from "./status-events";
 
 const UploadResponseSchema = z.object({
@@ -45,6 +47,17 @@ export async function submitTryOn(
         .json(),
     );
   return jobId;
+}
+
+export async function fitAdvice(
+  apiBase: string,
+  garment: GarmentProfile,
+  body: BodyProfile,
+): Promise<FitAdvice> {
+  const response: unknown = await ky
+    .post(`${apiBase}/api/fit`, { json: { garment, body } })
+    .json();
+  return FitAdviceSchema.parse(response);
 }
 
 export async function fetchAsBlob(imageUrl: string): Promise<File> {

@@ -3,16 +3,19 @@ import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slide
 import { HTTPError } from "ky";
 import {
   fetchAsBlob,
+  fitAdvice,
   runTryOn,
   submitTryOn,
   uploadErrorMessage,
   uploadImage,
 } from "./api";
+import { loadBodyProfile } from "./body-profile-store";
 import { CropStep } from "./crop-step";
+import { FitAdviceCard } from "./fit-advice";
 import { dataUrlToFile, fileToDataUrl, loadPersonPhoto, savePersonPhoto } from "./person-store";
 import { activeTabCandidates } from "./tab-candidates";
 import type { GarmentCandidate } from "../lib/detect";
-import type { GarmentProfile } from "../lib/profile/schema";
+import type { FitAdvice, GarmentProfile } from "../lib/profile/schema";
 import type { StatusEvent } from "./status-events";
 
 type Stage =
@@ -33,6 +36,29 @@ export interface TryOnFlowProps {
 
 export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlowProps) {
   const [stage, setStage] = useState<Stage>({ kind: "scanning" });
+  const [advice, setAdvice] = useState<FitAdvice | undefined>(undefined);
+  const [needsBodyProfile, setNeedsBodyProfile] = useState(false);
+
+  useEffect(() => {
+    if (initialProfile?.sizeChart === undefined) return;
+    let cancelled = false;
+    void (async () => {
+      const bodyProfile = await loadBodyProfile();
+      if (bodyProfile === undefined) {
+        if (!cancelled) setNeedsBodyProfile(true);
+        return;
+      }
+      try {
+        const result = await fitAdvice(apiBase, initialProfile, bodyProfile);
+        if (!cancelled) setAdvice(result);
+      } catch {
+        // Advice is best-effort: a backend hiccup never blocks try-on.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, initialProfile]);
 
   const scan = useCallback(async () => {
     setStage({ kind: "scanning" });
@@ -99,6 +125,10 @@ export function TryOnFlow({ apiBase, initialGarment, initialProfile }: TryOnFlow
   return (
     <section className="flow" aria-label="Try-on flow">
       {initialProfile !== undefined ? <ProfileLine profile={initialProfile} /> : null}
+      {advice !== undefined ? <FitAdviceCard advice={advice} /> : null}
+      {needsBodyProfile ? (
+        <p className="hint">Set your height in Your fit above for size advice.</p>
+      ) : null}
 
       {stage.kind === "scanning" ? <p className="hint">Looking for garments on this page…</p> : null}
 
