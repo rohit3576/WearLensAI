@@ -1,14 +1,17 @@
 /**
  * JobStore seam — persistent try-on job rows. SqliteJobStore (dev: a single
- * file under web/.data, zero setup) now; NeonJobStore (deploy: Neon
- * Postgres free tier) lands with the owner accounts in Phase 3 Step 8 —
- * see neon-job-store.ts. Fields per plan: id, status, person_url,
- * garment_url, result_url, created_at, completed_at (no users table).
+ * file under web/.data, zero setup) and NeonJobStore (deploy: Neon Postgres
+ * free tier over the serverless HTTP driver). Selection: TRYON_JOBS env
+ * (default "sqlite") via resolveJobStore. Fields per plan: id, status,
+ * person_url, garment_url, result_url, created_at, completed_at (no users
+ * table).
  */
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
 import type { JobId, JobStatus, SubmitTryOn } from "./engine";
+import { NeonJobStore, neonQueryFromEnv } from "./neon-job-store";
 
 export interface StoredJob {
   readonly id: string;
@@ -122,5 +125,29 @@ export class SqliteJobStore implements JobStore {
 
   async clear(): Promise<void> {
     this.db.exec("DELETE FROM tryon_jobs");
+  }
+}
+
+const JobStoreNameSchema = z.enum(["sqlite", "neon"]).default("sqlite");
+
+/**
+ * Resolve the job store from the environment. A typo in TRYON_JOBS fails
+ * loudly (ZodError) instead of silently downgrading; neon additionally
+ * requires DATABASE_URL (see neonQueryFromEnv).
+ */
+export function resolveJobStore(
+  env: Readonly<Record<string, string | undefined>>,
+  sqliteConfig: SqliteJobStoreConfig,
+): JobStore {
+  const name = JobStoreNameSchema.parse(env["TRYON_JOBS"]);
+  switch (name) {
+    case "sqlite":
+      return new SqliteJobStore(sqliteConfig);
+    case "neon":
+      return new NeonJobStore(neonQueryFromEnv(env));
+    default: {
+      const exhausted: never = name;
+      throw new Error(`unexpected job store name: ${String(exhausted)}`);
+    }
   }
 }

@@ -32,6 +32,10 @@ export interface StubEngineConfig {
   readonly resultUrlPrefix: string;
   /** Maps engine-input URLs to readable paths (dev wiring; identity default). */
   readonly resolveInputPath?: (url: string) => string;
+  /** Deploy wiring: hand the composite PNG to external storage, return its URL. */
+  readonly storeResult?: (png: Buffer) => Promise<string>;
+  /** Deploy wiring: keep the lifecycle alive past the response (e.g. waitUntil). */
+  readonly background?: (task: Promise<void>) => void;
   /** Observes post-submit transitions: processing, done, failed (not queued). */
   readonly onStatus?: (jobId: JobId, status: JobStatus) => void | Promise<void>;
 }
@@ -70,7 +74,12 @@ export class StubEngine implements TryOnEngine {
     const jobId = JobId(randomUUID());
     const job: StubJob = { input, status: { phase: "queued" } };
     this.jobs.set(jobId, job);
-    void this.runLifecycle(jobId, job);
+    const task = this.runLifecycle(jobId, job);
+    if (this.config.background !== undefined) {
+      this.config.background(task);
+    } else {
+      void task;
+    }
     return jobId;
   }
 
@@ -120,32 +129,52 @@ export class StubEngine implements TryOnEngine {
     }
   }
 
+  /**
+   * Inputs reach sharp as filesystem paths (dev), fetched Buffers (deploy:
+   * http(s) URLs such as R2), or the raw string as-is (identity default).
+   */
+  private async inputSource(url: string): Promise<string | Buffer> {
+    if (this.config.resolveInputPath !== undefined) {
+      return this.config.resolveInputPath(url);
+    }
+    if (/^https?:/.test(url)) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`failed to fetch input image ${url}: HTTP ${response.status}`);
+      }
+      return Buffer.from(await response.arrayBuffer());
+    }
+    return url;
+  }
+
   private async composite(jobId: JobId, input: SubmitTryOn): Promise<string> {
-    const resolve = this.config.resolveInputPath;
-    const personUrl = resolve === undefined ? input.personUrl : resolve(input.personUrl);
-    const garmentUrl = resolve === undefined ? input.garmentUrl : resolve(input.garmentUrl);
-    const meta = await sharp(personUrl).metadata();
+    const person = await this.inputSource(input.personUrl);
+    const garment = await this.inputSource(input.garmentUrl);
+    const meta = await sharp(person).metadata();
     if (meta.width === undefined || meta.height === undefined) {
       throw new Error(`cannot read dimensions of person image ${input.personUrl}`);
     }
     const garmentWidth = Math.round(meta.width * GARMENT_WIDTH_RATIO);
-    const garment = await sharp(garmentUrl)
+    const garmentOverlay = await sharp(garment)
       .resize(garmentWidth)
       .tint(STUB_TINT)
       .png()
       .toBuffer();
-    await mkdir(this.config.outputDir, { recursive: true });
-    const fileName = `${jobId}.png`;
-    await sharp(personUrl)
+    const composite = sharp(person)
       .composite([
         {
-          input: garment,
+          input: garmentOverlay,
           left: Math.round((meta.width - garmentWidth) / 2),
           top: Math.round(meta.height * GARMENT_TOP_RATIO),
         },
       ])
-      .png()
-      .toFile(path.join(this.config.outputDir, fileName));
+      .png();
+    if (this.config.storeResult !== undefined) {
+      return this.config.storeResult(await composite.toBuffer());
+    }
+    await mkdir(this.config.outputDir, { recursive: true });
+    const fileName = `${jobId}.png`;
+    await composite.toFile(path.join(this.config.outputDir, fileName));
     return `${this.config.resultUrlPrefix}${fileName}`;
   }
 

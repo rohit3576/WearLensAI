@@ -1,19 +1,24 @@
 /**
  * Runtime composition root — one memoized bundle per server process:
- * storage (uploads), job store (sqlite rows), and the tracking-wrapped
- * engine (store.create on submit, store.update on each transition).
+ * storage (local disk │ R2), job store (sqlite │ Neon), and the
+ * tracking-wrapped engine (store.create on submit, store.update on each
+ * transition).
  *
  * Dev wiring: StubEngine inputs resolve /api/files URLs to local paths via
- * LocalStorage.pathOf. Vitest isolates module state per test file, so each
- * file gets its own runtime against its own TRYON_DATA_DIR.
+ * LocalStorage.pathOf. Deploy wiring (non-local storage): inputs are
+ * fetched over http(s), results go back through storage.put, and the
+ * lifecycle is kept alive past the response via Vercel's waitUntil.
+ * Vitest isolates module state per test file, so each file gets its own
+ * runtime against its own TRYON_DATA_DIR.
  */
+import { waitUntil } from "@vercel/functions";
 import path from "node:path";
 import { LocalStorage, resolveStorage } from "./storage";
 import type { Storage } from "./storage";
 import { resolveEngine } from "./tryon/engine";
 import type { JobId, SubmitTryOn, TryOnEngine, TryOnResult } from "./tryon/engine";
 import type { JobStatus } from "./tryon/engine";
-import { SqliteJobStore } from "./tryon/job-store";
+import { resolveJobStore } from "./tryon/job-store";
 import type { JobStore } from "./tryon/job-store";
 import { defaultStubConfig } from "./tryon/stub-engine";
 import type { StubEngineConfig } from "./tryon/stub-engine";
@@ -60,7 +65,7 @@ function envInt(
 function buildRuntime(env: Readonly<Record<string, string | undefined>>): Runtime {
   const root = env["TRYON_DATA_DIR"] ?? ".data";
   const storage = resolveStorage(env);
-  const store = new SqliteJobStore({ dbPath: path.join(root, "jobs.db") });
+  const store = resolveJobStore(env, { dbPath: path.join(root, "jobs.db") });
   const resultsDir = path.join(root, "tryon");
   const stubConfig: StubEngineConfig = {
     ...defaultStubConfig,
@@ -70,6 +75,12 @@ function buildRuntime(env: Readonly<Record<string, string | undefined>>): Runtim
     onStatus: (jobId, status) => store.update(jobId, status),
     ...(storage instanceof LocalStorage
       ? { resolveInputPath: (url: string) => storage.pathOf(url) }
+      : {
+          storeResult: (png: Buffer) =>
+            storage.put({ bytes: png, contentType: "image/png" }),
+        }),
+    ...(env["VERCEL"] === "1"
+      ? { background: (task: Promise<void>) => waitUntil(task) }
       : {}),
   };
   return {
