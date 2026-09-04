@@ -16,7 +16,7 @@ export const SizeRowSchema = z.object({
 export const SizeChartSchema = z.object({
   unit: z.literal("cm"),
   rows: z.array(SizeRowSchema).min(1),
-  from: z.literal("dom-table"),
+  from: z.enum(["dom-table", "llm"]),
 });
 
 export const GarmentProfileSchema = z.object({
