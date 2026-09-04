@@ -72,6 +72,28 @@ Honest limits:
   rejected on purpose rather than misread as centimetres.
 - A page without a chart gets no advice, never a guessed size.
 
+## LLM normalization (off by default)
+
+When a page's size chart defeats the deterministic reader — messy
+table structure, unusual markup — the backend can normalize it with a
+language model:
+
+- **When it runs:** only after a badge click whose deterministic pass
+  found no chart, and only once per page per browser session (cached).
+  Pages whose chart was already read never trigger a model call.
+- **What is sent:** the page's own public content — up to five
+  size-related HTML tables and the ld+json blocks, size-capped. Never
+  your photo, never your body profile, never cookies.
+- **What it costs:** nothing until the deployment owner opts in.
+  Backends run `TRYON_NORMALIZER=rules` by default (a passthrough —
+  the extension behaves exactly as documented above). Enabling the
+  model path is one env flip plus a provider key; see
+  [docs/deploy.md](deploy.md).
+- **What comes back:** a size chart validated against the same
+  contract, marked as model-found. If the model finds nothing, times
+  out, or returns garbage, the panel falls back to the honest
+  no-chart view — a model failure is never a wrong size.
+
 ## Build from source
 
 ```bash

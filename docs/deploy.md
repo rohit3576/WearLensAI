@@ -60,6 +60,16 @@ The `tryon_jobs` table creates itself on first use — no migration step.
 | `R2_BUCKET` | bucket name |
 | `R2_PUBLIC_BASE_URL` | `https://pub-<hash>.r2.dev` |
 
+**Optional — LLM size-chart normalization (has a per-call cost):**
+everything above stays $0. This row is the only paid surface, and it
+is off unless you set it:
+
+| Name | Value |
+|---|---|
+| `TRYON_NORMALIZER` | `llm` to enable (default `rules` = free passthrough) |
+| `GEMINI_API_KEY` | Google AI Studio key — required when `llm` |
+| `NORMALIZER_MODEL` | optional; default `gemini-2.0-flash` |
+
 4. **Deploy.**
 
 Both flips must be set together on Vercel: its filesystem is read-only,
