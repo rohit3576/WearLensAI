@@ -6,6 +6,8 @@
  * shopper always confirms the pick — ML segmentation is a later unlock.
  */
 
+import { isProductNode, visitJsonLdNodes } from "./jsonld-walk";
+
 export type CandidateSource = "jsonld" | "og" | "gallery";
 
 export interface GarmentCandidate {
@@ -48,13 +50,6 @@ const CLOTHING_KEYWORDS = [
   "model",
 ] as const;
 
-function isProductNode(node: Record<string, unknown>): boolean {
-  const type = node["@type"];
-  if (typeof type === "string") return type === "Product";
-  if (Array.isArray(type)) return type.some((entry) => entry === "Product");
-  return false;
-}
-
 /** Extract image URL strings from a Product node's `image` field. */
 function imageUrlsOf(node: Record<string, unknown>): string[] {
   const image = node["image"];
@@ -72,38 +67,16 @@ function imageUrlsOf(node: Record<string, unknown>): string[] {
 
 function jsonLdCandidates(doc: Document): GarmentCandidate[] {
   const candidates: GarmentCandidate[] = [];
-  for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(script.textContent ?? "");
-    } catch {
-      continue;
-    }
-    const nodes: Record<string, unknown>[] = [];
-    const collect = (value: unknown): void => {
-      if (Array.isArray(value)) {
-        for (const entry of value) collect(entry);
-        return;
-      }
-      if (value !== null && typeof value === "object") {
-        const node = value as Record<string, unknown>;
-        nodes.push(node);
-        const graph = node["@graph"];
-        if (Array.isArray(graph)) collect(graph);
-      }
-    };
-    collect(parsed);
-    for (const node of nodes) {
-      if (!isProductNode(node)) continue;
-      for (const src of imageUrlsOf(node)) {
-        candidates.push({
-          src,
-          width: 0,
-          height: 0,
-          score: SCORES.jsonld,
-          source: "jsonld",
-        });
-      }
+  for (const node of visitJsonLdNodes(doc)) {
+    if (!isProductNode(node)) continue;
+    for (const src of imageUrlsOf(node)) {
+      candidates.push({
+        src,
+        width: 0,
+        height: 0,
+        score: SCORES.jsonld,
+        source: "jsonld",
+      });
     }
   }
   return candidates;
